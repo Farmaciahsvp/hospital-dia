@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ClipboardList, Pill, Rows3 } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, Pill, Rows3 } from "lucide-react";
 import type { ReactNode } from "react";
 
 type Item = { href: string; label: string; icon: ReactNode };
@@ -23,6 +23,11 @@ const ITEMS: Item[] = [
     href: "/medicamentos",
     label: "MEDICAMENTOS",
     icon: <Pill className="h-4 w-4" aria-hidden="true" />,
+  },
+  {
+    href: "/estadistica",
+    label: "ESTADÍSTICA",
+    icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
   },
 ];
 
@@ -60,4 +65,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

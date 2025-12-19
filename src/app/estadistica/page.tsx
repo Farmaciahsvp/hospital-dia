@@ -1,15 +1,15 @@
-import { CatalogoPersonas } from "@/components/CatalogoPersonas";
+import { Estadistica } from "@/components/Estadistica";
 import { NavPills } from "@/components/NavPills";
 import { Archive, BookOpen, Stethoscope, UserRound } from "lucide-react";
 
-export default function FarmaceuticosPage() {
+export default function EstadisticaPage() {
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
             <div className="text-sm font-medium text-zinc-500">HOSPITAL DE HEREDIA</div>
-            <h1 className="text-lg font-semibold">FARMACÉUTICOS</h1>
+            <h1 className="text-lg font-semibold">ESTADÍSTICA</h1>
           </div>
           <div className="flex items-center gap-3">
             <NavPills
@@ -23,7 +23,7 @@ export default function FarmaceuticosPage() {
           </div>
         </div>
       </header>
-      <CatalogoPersonas title="FARMACÉUTICOS" apiPath="/api/pharmacists" codigoLabel="CÓDIGO" />
+      <Estadistica />
     </>
   );
 }

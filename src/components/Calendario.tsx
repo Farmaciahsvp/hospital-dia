@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, RefreshCw } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
+import { exportCalendarDayPdf, type CalendarDayExportRow } from "@/lib/export";
 
 type DayPatient = {
   patientId?: string;
@@ -22,9 +23,13 @@ type AgendaItem = {
   patientId?: string;
   prepRequestId?: string;
   fechaAplicacion: string;
+  numeroReceta?: string | null;
   estado: string;
   identificacion: string;
   nombre: string | null;
+  medicationCodigo?: string | null;
+  medicationNombre?: string;
+  medicationViaAdministracion?: string | null;
   medicamento: string;
   dosisTexto: string;
   unidadesRequeridas: number;
@@ -64,6 +69,7 @@ export function Calendario() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patients, setPatients] = useState<DayPatient[]>([]);
+  const [items, setItems] = useState<AgendaItem[]>([]);
 
   const monthLabel = useMemo(() => {
     return month.toLocaleDateString("es-ES", { month: "long", year: "numeric" }).toUpperCase();
@@ -93,6 +99,7 @@ export function Calendario() {
         cache: "no-store",
       });
       const items = data.items ?? [];
+      setItems(items);
 
       const map = new Map<string, DayPatient>();
       for (const it of items) {
@@ -118,6 +125,7 @@ export function Calendario() {
       setPatients(list);
     } catch (e) {
       setPatients([]);
+      setItems([]);
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setLoading(false);
@@ -127,6 +135,37 @@ export function Calendario() {
   useEffect(() => {
     void loadDay(selected);
   }, [selected]);
+
+  function handleExportPdf() {
+    if (!items.length) return;
+    const rows: CalendarDayExportRow[] = items
+      .map((it) => ({
+        identificacion: it.identificacion,
+        nombre: it.nombre,
+        numeroReceta: it.numeroReceta ?? null,
+        medicationCodigo: it.medicationCodigo ?? null,
+        medicationNombre: it.medicationNombre ?? it.medicamento,
+        viaAdministracion: it.medicationViaAdministracion ?? null,
+        dosis: it.dosisTexto,
+        unidades: it.unidadesRequeridas,
+      }))
+      .sort((a, b) => {
+        const byId = a.identificacion.localeCompare(b.identificacion);
+        if (byId) return byId;
+        const byCode = (a.medicationCodigo ?? "").localeCompare(b.medicationCodigo ?? "");
+        if (byCode) return byCode;
+        const byName = a.medicationNombre.localeCompare(b.medicationNombre);
+        if (byName) return byName;
+        return a.dosis.localeCompare(b.dosis);
+      });
+
+    exportCalendarDayPdf(
+      rows,
+      `CALENDARIO_${selected}.pdf`,
+      "HOSPITAL DE HEREDIA - SERVICIO DE FARMACIA",
+      `PACIENTES DEL DIA ${formatDMY(selected)}`,
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6">
@@ -206,15 +245,28 @@ export function Calendario() {
                 <div className="text-xs font-medium text-zinc-500">DÍA SELECCIONADO</div>
                 <div className="text-sm font-semibold text-zinc-900">{formatDMY(selected)}</div>
               </div>
-              <Button
-                variant="secondary"
-                type="button"
-                className="py-1.5"
-                onClick={() => void loadDay(selected)}
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                ACTUALIZAR
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="py-1.5"
+                  onClick={handleExportPdf}
+                  disabled={loading || !items.length}
+                  title={items.length ? "EXPORTAR PDF" : "NO HAY DATOS PARA EXPORTAR"}
+                >
+                  <FileText className="h-4 w-4" aria-hidden="true" />
+                  EXPORTAR PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="py-1.5"
+                  onClick={() => void loadDay(selected)}
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  ACTUALIZAR
+                </Button>
+              </div>
             </div>
 
             {error ? (

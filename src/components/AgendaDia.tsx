@@ -600,10 +600,6 @@ export function AgendaDia() {
                 { href: "/historico", label: "Histórico", icon: <Archive className="h-4 w-4" aria-hidden="true" /> },
               ]}
             />
-            <div className="text-sm text-zinc-600">Usuario/rol: Farmacia</div>
-            <Button variant="secondary" className="py-1.5">
-              Cerrar sesión
-            </Button>
           </div>
         </div>
       </header>
@@ -744,6 +740,9 @@ export function AgendaDia() {
                 <Input
                   className="mt-1"
                   inputMode="numeric"
+                  maxLength={6}
+                  pattern="[0-9]{6}"
+                  title="DEBE SER EXACTAMENTE DE 6 DIGITOS"
                   placeholder="000000"
                   {...register("numeroReceta")}
                   ref={(el) => {
@@ -752,7 +751,14 @@ export function AgendaDia() {
                   }}
                   onChange={(e) => {
                     const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
+                    e.target.value = onlyDigits;
                     setValue("numeroReceta", onlyDigits, { shouldValidate: true });
+                  }}
+                  onBlur={(e) => {
+                    const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
+                    const normalized = onlyDigits ? onlyDigits.padStart(6, "0") : "";
+                    e.target.value = normalized;
+                    setValue("numeroReceta", normalized, { shouldValidate: true });
                   }}
                 />
                 {formState.errors.numeroReceta ? (
@@ -1604,17 +1610,20 @@ export function AgendaDia() {
               <Input
                 className="mt-1"
                 inputMode="numeric"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                title="DEBE SER EXACTAMENTE DE 6 DIGITOS"
                 value={editUltimo.numeroReceta ?? ""}
-                onChange={(e) =>
-                  setEditUltimo((p) =>
-                    p
-                      ? {
-                          ...p,
-                          numeroReceta: e.target.value.replace(/\\D/g, "").slice(0, 6) || null,
-                        }
-                      : p,
-                  )
-                }
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
+                  e.target.value = onlyDigits;
+                  setEditUltimo((p) => (p ? { ...p, numeroReceta: onlyDigits || null } : p));
+                }}
+                onBlur={(e) => {
+                  const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
+                  const normalized = onlyDigits ? onlyDigits.padStart(6, "0") : "";
+                  setEditUltimo((p) => (p ? { ...p, numeroReceta: normalized || null } : p));
+                }}
               />
             </div>
             <div>

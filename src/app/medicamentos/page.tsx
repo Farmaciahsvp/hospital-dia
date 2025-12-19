@@ -1,6 +1,5 @@
 import { MedicamentosPanel } from "@/components/MedicamentosPanel";
 import { NavPills } from "@/components/NavPills";
-import { Button } from "@/components/ui/Button";
 import { Archive, BookOpen, Pill, Stethoscope, UserRound } from "lucide-react";
 
 export default function MedicamentosPage() {
@@ -9,7 +8,7 @@ export default function MedicamentosPage() {
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
-            <div className="text-sm font-medium text-zinc-500">HOSPITAL DE DÍA</div>
+            <div className="text-sm font-medium text-zinc-500">HOSPITAL DE HEREDIA</div>
             <h1 className="text-lg font-semibold">MEDICAMENTOS</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -22,9 +21,6 @@ export default function MedicamentosPage() {
                 { href: "/historico", label: "HISTÓRICO", icon: <Archive className="h-4 w-4" aria-hidden="true" /> },
               ]}
             />
-            <Button variant="secondary" className="py-1.5">
-              CERRAR SESIÓN
-            </Button>
           </div>
         </div>
       </header>

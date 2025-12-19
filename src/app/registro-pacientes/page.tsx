@@ -1,6 +1,5 @@
 import { RegistroPacientes } from "@/components/RegistroPacientes";
 import { NavPills } from "@/components/NavPills";
-import { Button } from "@/components/ui/Button";
 import { Archive, BookOpen, Stethoscope, UserRound } from "lucide-react";
 
 export default function RegistroPacientesPage() {
@@ -16,22 +15,11 @@ export default function RegistroPacientesPage() {
             <NavPills
               items={[
                 { href: "/catalogo", label: "CATÁLOGO", icon: <BookOpen className="h-4 w-4" aria-hidden="true" /> },
-                {
-                  href: "/farmaceuticos",
-                  label: "FARMACÉUTICOS",
-                  icon: <UserRound className="h-4 w-4" aria-hidden="true" />,
-                },
-                {
-                  href: "/prescriptores",
-                  label: "PRESCRIPTOR",
-                  icon: <Stethoscope className="h-4 w-4" aria-hidden="true" />,
-                },
+                { href: "/farmaceuticos", label: "FARMACÉUTICOS", icon: <UserRound className="h-4 w-4" aria-hidden="true" /> },
+                { href: "/prescriptores", label: "PRESCRIPTOR", icon: <Stethoscope className="h-4 w-4" aria-hidden="true" /> },
                 { href: "/historico", label: "HISTÓRICO", icon: <Archive className="h-4 w-4" aria-hidden="true" /> },
               ]}
             />
-            <Button variant="secondary" className="py-1.5">
-              CERRAR SESIÓN
-            </Button>
           </div>
         </div>
       </header>

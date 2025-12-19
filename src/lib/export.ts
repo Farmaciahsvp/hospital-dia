@@ -64,3 +64,66 @@ export function exportConsolidatedPdf(
   });
   doc.save(filename);
 }
+
+export type CalendarDayExportRow = {
+  identificacion: string;
+  nombre: string | null;
+  numeroReceta: string | null;
+  medicationCodigo: string | null;
+  medicationNombre: string;
+  viaAdministracion: string | null;
+  dosis: string;
+  unidades: number;
+};
+
+export function exportCalendarDayPdf(
+  rows: CalendarDayExportRow[],
+  filename: string,
+  title: string,
+  dayLabel: string,
+) {
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14);
+  doc.text(title, 14, 14);
+  doc.setFontSize(11);
+  doc.text(dayLabel, 14, 30);
+
+  autoTable(doc, {
+    startY: 40,
+    head: [
+      [
+        "CEDULA",
+        "NOMBRE",
+        "NUMERO RECETA",
+        "CODIGO MEDICAMENTO",
+        "MEDICAMENTO",
+        "DOSIS",
+        "VIA ADMINISTRACION",
+        "UNIDADES",
+      ],
+    ],
+    body: rows.map((r) => [
+      r.identificacion,
+      r.nombre ?? "",
+      r.numeroReceta ?? "",
+      r.medicationCodigo ?? "",
+      r.medicationNombre,
+      r.dosis,
+      r.viaAdministracion ?? "",
+      String(r.unidades),
+    ]),
+    styles: { fontSize: 9, cellPadding: 2, halign: "center", valign: "middle" },
+    headStyles: { fillColor: [24, 24, 27], halign: "center" },
+  });
+
+  const lastY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 40;
+  const signatureY = Math.min(lastY + 24, doc.internal.pageSize.getHeight() - 70);
+  doc.setFontSize(10);
+  doc.text(
+    "DIGITADOR: ____________________    ACOPIADO POR: ____________________    ENTREGADO POR: ____________________    RECIBIDO POR: ____________________",
+    14,
+    signatureY,
+  );
+
+  doc.save(filename);
+}
