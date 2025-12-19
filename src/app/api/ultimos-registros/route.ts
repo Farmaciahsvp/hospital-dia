@@ -115,6 +115,14 @@ export async function GET(request: Request) {
   } catch (e) {
     console.error({ requestId, route: "GET /api/ultimos-registros", error: e });
     const message = e instanceof Error ? e.message : "Error";
+    const lower = message.toLowerCase();
+    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
+      return jsonError(
+        requestId,
+        "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
+        { status: 503, details: message },
+      );
+    }
     return jsonError(requestId, message, { status: 500 });
   }
 }
