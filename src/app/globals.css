@@ -24,3 +24,38 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Flat Design 2.0 feel: smoother text and backgrounds */
+html,
+body {
+  background-color: #f6f8fc;
+}
+
+/* Entrada en mayúsculas (UI) */
+input[type="text"],
+input[type="search"],
+input[type="tel"],
+textarea {
+  text-transform: uppercase;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(24, 24, 27, 0.75);
+  outline-offset: 2px;
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+}

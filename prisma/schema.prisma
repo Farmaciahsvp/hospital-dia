@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ItemStatus {
+  pendiente
+  en_preparacion
+  listo
+  entregado
+  cancelado
+}
+
+enum AcquisitionType {
+  almacenable
+  compra_local
+}
+
+model Patient {
+  id             String        @id @default(uuid())
+  identificacion String        @unique
+  nombre         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  requests       PrepRequest[]
+
+  @@map("patients")
+}
+
+model Pharmacist {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nombres   String
+  apellidos String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  requests  PrepRequest[]
+
+  @@map("pharmacists")
+}
+
+model Prescriber {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nombres   String
+  apellidos String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  requests  PrepRequest[]
+
+  @@map("prescribers")
+}
+
+model Medication {
+  id                  String            @id @default(uuid())
+  codigoInstitucional String?           @unique
+  nombre              String
+  concentracion       String?
+  viaAdministracion   String?
+  presentacion        String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  items               PrepRequestItem[]
+
+  @@index([nombre])
+  @@map("medications")
+}
+
+model PrepRequest {
+  id              String            @id @default(uuid())
+  fechaAplicacion DateTime          @db.Date
+  fechaRecepcion  DateTime?         @db.Date
+  numeroReceta    String?
+  patientId       String
+  prescriberId    String?
+  pharmacistId    String?
+  observaciones   String?
+  finalizadoAt    DateTime?
+  finalizadoBy    String?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  prescriber      Prescriber?       @relation(fields: [prescriberId], references: [id])
+  pharmacist      Pharmacist?       @relation(fields: [pharmacistId], references: [id])
+  items           PrepRequestItem[]
+
+  @@unique([fechaAplicacion, patientId])
+  @@index([fechaAplicacion, patientId])
+  @@index([numeroReceta])
+  @@map("prep_requests")
+}
+
+model PrepRequestItem {
+  id                String     @id @default(uuid())
+  prepRequestId     String
+  medicationId      String
+  dosisTexto        String
+  unidadesRequeridas Decimal    @db.Decimal(12, 2)
+  estado            ItemStatus  @default(pendiente)
+  frecuencia         String?
+  adquisicion        AcquisitionType @default(almacenable)
+  observaciones     String?
+  entregadoAt       DateTime?
+  canceladoMotivo   String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  prepRequest       PrepRequest @relation(fields: [prepRequestId], references: [id])
+  medication        Medication  @relation(fields: [medicationId], references: [id])
+
+  @@index([estado, updatedAt])
+  @@index([prepRequestId])
+  @@index([medicationId])
+  @@map("prep_request_items")
+}
