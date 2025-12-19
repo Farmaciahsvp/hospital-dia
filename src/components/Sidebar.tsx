@@ -35,11 +35,11 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 shrink-0 border-r border-zinc-200 bg-white/90 backdrop-blur print:hidden">
+    <aside className="w-56 shrink-0 border-r border-blue-950 bg-blue-950 text-blue-50 print:hidden">
       <div className="sticky top-0 p-3">
-        <div className="mb-3 rounded-2xl border border-zinc-200 bg-white px-3 py-3 shadow-sm">
-          <div className="text-xs font-semibold tracking-wide text-blue-700">MENÚ</div>
-          <div className="mt-1 text-sm font-semibold text-zinc-900">HOSPITAL DE HEREDIA</div>
+        <div className="mb-3 rounded-2xl border border-blue-900/60 bg-blue-900/30 px-3 py-3 shadow-sm">
+          <div className="text-xs font-semibold tracking-wide text-blue-200">MENÚ</div>
+          <div className="mt-1 text-sm font-semibold text-white">HOSPITAL DE HEREDIA</div>
         </div>
         <nav className="space-y-2">
           {ITEMS.map((item) => {
@@ -51,11 +51,11 @@ export function Sidebar() {
                 className={[
                   "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition",
                   active
-                    ? "border-blue-200 bg-blue-50 text-blue-800"
-                    : "border-zinc-200 bg-white text-zinc-800 hover:bg-blue-50/40",
+                    ? "border-blue-700 bg-blue-800 text-white"
+                    : "border-blue-900/50 bg-blue-950/10 text-blue-50 hover:bg-blue-900/30",
                 ].join(" ")}
               >
-                <span className={active ? "text-blue-700" : "text-zinc-600"}>{item.icon}</span>
+                <span className={active ? "text-white" : "text-blue-200"}>{item.icon}</span>
                 <span>{item.label}</span>
               </Link>
             );
