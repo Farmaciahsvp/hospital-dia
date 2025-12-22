@@ -86,27 +86,29 @@ type PersonOption = {
   apellidos: string;
 };
 
-const quickSchema = z.object({
-  fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  numeroReceta: z
-    .string()
-    .transform((v) => v.replace(/\D/g, "").slice(0, 6))
-    .refine((v) => !v || /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" })
-    .optional(),
-  prescriberId: z.string().uuid().optional(),
-  pharmacistId: z.string().uuid().optional(),
-  pharmacistTexto: z.string().optional(),
-  prescriberTexto: z.string().optional(),
-  identificacion: z.string().trim().min(1),
-  nombre: z.string().trim().min(1).optional(),
-  medicamentoId: z.string().uuid().optional(),
-  medicamentoTexto: z.string().trim().min(1),
-  dosisTexto: z.string().trim().min(1),
-  unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
-  frecuencia: z.string().trim().max(50).optional(),
-  adquisicion: z.enum(["almacenable", "compra_local"]).default("almacenable"),
-  observaciones: z.string().trim().max(300).optional(),
-});
+  const quickSchema = z.object({
+    fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    numeroReceta: z
+      .string()
+      .transform((v) => v.replace(/\D/g, "").slice(0, 6))
+      .refine((v) => !v || /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" })
+      .optional(),
+    prescriberId: z.string().uuid().optional(),
+    pharmacistId: z.string().uuid().optional(),
+    pharmacistTexto: z.string().optional(),
+    prescriberTexto: z.string().optional(),
+    claveAutorizacion: z.string().trim().max(100).optional(),
+    identificacion: z.string().trim().min(1),
+    nombre: z.string().trim().min(1).optional(),
+    medicamentoId: z.string().uuid().optional(),
+    medicamentoTexto: z.string().trim().min(1),
+    dosisTexto: z.string().trim().min(1),
+    unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
+    totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive()).optional(),
+    frecuencia: z.string().trim().max(50).optional(),
+    adquisicion: z.enum(["almacenable", "compra_local"]).default("almacenable"),
+    observaciones: z.string().trim().max(300).optional(),
+  });
 
 type QuickForm = z.infer<typeof quickSchema>;
 
@@ -142,12 +144,67 @@ function formatDMY(dateStr: string) {
   return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
 }
 
+function parseDateInputToISO(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+
+  const isValid = (y: number, m: number, d: number) => {
+    if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return false;
+    if (y < 1900 || y > 2100) return false;
+    if (m < 1 || m > 12) return false;
+    if (d < 1) return false;
+    const daysInMonth = new Date(y, m, 0).getDate();
+    return d <= daysInMonth;
+  };
+
+  const toIso = (y: number, m: number, d: number) =>
+    `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  const ymd = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    const y = Number(ymd[1]);
+    const m = Number(ymd[2]);
+    const d = Number(ymd[3]);
+    return isValid(y, m, d) ? toIso(y, m, d) : null;
+  }
+
+  const dmy = value.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (dmy) {
+    const d = Number(dmy[1]);
+    const m = Number(dmy[2]);
+    const y = Number(dmy[3]);
+    return isValid(y, m, d) ? toIso(y, m, d) : null;
+  }
+
+  const digits = value.match(/^(\d{8})$/);
+  if (digits) {
+    const s = digits[1];
+    const first4 = Number(s.slice(0, 4));
+    const last4 = Number(s.slice(4));
+    if (first4 >= 1900 && first4 <= 2100) {
+      const y = first4;
+      const m = Number(s.slice(4, 6));
+      const d = Number(s.slice(6, 8));
+      return isValid(y, m, d) ? toIso(y, m, d) : null;
+    }
+    if (last4 >= 1900 && last4 <= 2100) {
+      const d = Number(s.slice(0, 2));
+      const m = Number(s.slice(2, 4));
+      const y = last4;
+      return isValid(y, m, d) ? toIso(y, m, d) : null;
+    }
+  }
+
+  return null;
+}
+
 export function AgendaDia() {
   useRouter();
   const [fecha, setFecha] = useState(() => new Date());
   const fechaStr = useMemo(() => toISODateString(fecha), [fecha]);
   const [fechaInput, setFechaInput] = useState(() => toISODateString(new Date()));
   const [applyDates, setApplyDates] = useState<string[]>(() => [toISODateString(new Date())]);
+  const [applyDateTexts, setApplyDateTexts] = useState<string[]>(() => [formatDMY(toISODateString(new Date()))]);
 
   useEffect(() => {
     setFechaInput(fechaStr);
@@ -155,6 +212,7 @@ export function AgendaDia() {
 
   useEffect(() => {
     setApplyDates((prev) => (prev.length === 1 ? [fechaStr] : prev));
+    setApplyDateTexts((prev) => (prev.length === 1 ? [formatDMY(fechaStr)] : prev));
   }, [fechaStr]);
 
   const [searchPatient, setSearchPatient] = useState("");
@@ -307,11 +365,13 @@ export function AgendaDia() {
       pharmacistId: undefined,
       pharmacistTexto: "",
       prescriberTexto: "",
+      claveAutorizacion: "",
       identificacion: "",
       nombre: "",
       medicamentoTexto: "",
       dosisTexto: "",
       unidadesRequeridas: 1,
+      totalCiclos: 1,
       frecuencia: "",
       adquisicion: "almacenable",
       observaciones: "",
@@ -320,6 +380,49 @@ export function AgendaDia() {
 
   const quickIdentRef = useRef<HTMLInputElement | null>(null);
   const quickRecetaRef = useRef<HTMLInputElement | null>(null);
+  const quickFormRef = useRef<HTMLFormElement | null>(null);
+
+  const totalCiclos = useMemo(() => new Set(applyDates.filter(Boolean)).size, [applyDates]);
+  useEffect(() => {
+    setValue("totalCiclos", totalCiclos, { shouldValidate: true });
+  }, [setValue, totalCiclos]);
+
+  const focusNextQuickField = useCallback((current: HTMLElement, direction: 1 | -1) => {
+    const form = quickFormRef.current;
+    if (!form) return;
+
+    const focusables = Array.from(
+      form.querySelectorAll<HTMLElement>("input, select, textarea, button"),
+    ).filter((el) => {
+      if (el.tabIndex === -1) return false;
+      if (el.getAttribute("disabled") !== null) return false;
+      if (el.getAttribute("aria-disabled") === "true") return false;
+      if (el instanceof HTMLInputElement && el.type === "hidden") return false;
+      if (el instanceof HTMLButtonElement && el.type !== "submit") return false;
+      if (el.offsetParent === null) return false;
+      return true;
+    });
+
+    const idx = focusables.indexOf(current);
+    if (idx === -1) return;
+    const next = focusables[idx + direction];
+    if (next) next.focus();
+  }, []);
+
+  const onQuickKeyDownCapture = useCallback(
+    (e: React.KeyboardEvent<HTMLFormElement>) => {
+      if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target instanceof HTMLButtonElement) return;
+      if (target instanceof HTMLTextAreaElement) return;
+
+      e.preventDefault();
+      focusNextQuickField(target, e.shiftKey ? -1 : 1);
+    },
+    [focusNextQuickField],
+  );
 
   const loadPatientSuggestions = useCallback(async (query: string) => {
     const url = new URL("/api/patients", window.location.origin);
@@ -390,7 +493,15 @@ export function AgendaDia() {
           unidadesRequeridas: values.unidadesRequeridas,
           frecuencia: values.frecuencia || null,
           adquisicion: values.adquisicion || "almacenable",
-          observaciones: values.observaciones || null,
+          observaciones:
+            values.claveAutorizacion?.trim() || values.observaciones?.trim()
+              ? [
+                  values.claveAutorizacion?.trim() ? `Clave autorización: ${values.claveAutorizacion.trim()}` : null,
+                  values.observaciones?.trim() ? values.observaciones.trim() : null,
+                ]
+                  .filter(Boolean)
+                  .join(" | ")
+              : null,
           createdBy: "farmacia",
         }),
       });
@@ -404,21 +515,27 @@ export function AgendaDia() {
       });
       reset({
         fechaRecepcion: values.fechaRecepcion,
-        numeroReceta: values.numeroReceta ?? "",
-        prescriberId: values.prescriberId,
-        pharmacistId: values.pharmacistId,
-        pharmacistTexto: values.pharmacistTexto ?? "",
-        prescriberTexto: values.prescriberTexto ?? "",
-        identificacion: values.identificacion,
-        nombre: values.nombre,
+        numeroReceta: "",
+        prescriberId: undefined,
+        prescriberTexto: "",
+        claveAutorizacion: "",
+        pharmacistId: undefined,
+        pharmacistTexto: "",
+        identificacion: "",
+        nombre: "",
         medicamentoId: undefined,
         medicamentoTexto: "",
         dosisTexto: "",
         unidadesRequeridas: 1,
-        frecuencia: values.frecuencia ?? "",
-        adquisicion: values.adquisicion ?? "almacenable",
+        totalCiclos: 1,
+        frecuencia: "",
+        adquisicion: "almacenable",
         observaciones: "",
       });
+      setApplyDates([fechaStr]);
+      setApplyDateTexts([formatDMY(fechaStr)]);
+      setPatientSuggestions([]);
+      setMedSuggestions([]);
       await refresh();
       await loadUltimos();
       quickIdentRef.current?.focus();
@@ -728,9 +845,14 @@ export function AgendaDia() {
           <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 shadow-sm lg:sticky lg:top-20">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-zinc-900">Captura rápida</div>
-              <div className="text-xs text-zinc-500">Enter: guardar</div>
+              <div className="text-xs text-zinc-500">Enter: siguiente campo (en Guardar: guarda)</div>
             </div>
-            <form className="grid grid-cols-1 gap-3 md:grid-cols-7" onSubmit={onQuickSubmit}>
+            <form
+              ref={quickFormRef}
+              className="grid grid-cols-1 gap-3 md:grid-cols-7"
+              onSubmit={onQuickSubmit}
+              onKeyDownCapture={onQuickKeyDownCapture}
+            >
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-zinc-600">Fecha de recepción</label>
                 <Input className="mt-1" type="date" {...register("fechaRecepcion")} />
@@ -765,60 +887,6 @@ export function AgendaDia() {
                   <div className="mt-1 text-xs text-rose-700">{formState.errors.numeroReceta.message}</div>
                 ) : null}
               </div>
-              <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">Prescriptor</label>
-                <Input
-                  className="mt-1"
-                  list="prescriber-suggestions"
-                  placeholder="ESCRIBA PARA BUSCAR"
-                  {...register("prescriberTexto")}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setValue("prescriberTexto", val);
-                    const match = prescribers.find((p) => personLabel(p) === val);
-                    setValue("prescriberId", match?.id);
-                  }}
-                  onBlur={() => {
-                    const val =
-                      (document.querySelector('input[name="prescriberTexto"]') as HTMLInputElement | null)?.value ??
-                      "";
-                    const match = prescribers.find((p) => personLabel(p) === val);
-                    setValue("prescriberId", match?.id);
-                  }}
-                />
-                <datalist id="prescriber-suggestions">
-                  {prescribers.map((p) => (
-                    <option key={p.id} value={personLabel(p)} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">Farmacéutico</label>
-                <Input
-                  className="mt-1"
-                  list="pharmacist-suggestions"
-                  placeholder="ESCRIBA PARA BUSCAR"
-                  {...register("pharmacistTexto")}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setValue("pharmacistTexto", val);
-                    const match = pharmacists.find((p) => personLabel(p) === val);
-                    setValue("pharmacistId", match?.id);
-                  }}
-                  onBlur={() => {
-                    const val =
-                      (document.querySelector('input[name="pharmacistTexto"]') as HTMLInputElement | null)?.value ??
-                      "";
-                    const match = pharmacists.find((p) => personLabel(p) === val);
-                    setValue("pharmacistId", match?.id);
-                  }}
-                />
-                <datalist id="pharmacist-suggestions">
-                  {pharmacists.map((p) => (
-                    <option key={p.id} value={personLabel(p)} />
-                  ))}
-                </datalist>
-              </div>
               <div className="md:col-span-1">
                 <label className="block text-xs font-medium text-zinc-600">Identificación</label>
                 <Input
@@ -849,7 +917,7 @@ export function AgendaDia() {
                 </datalist>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Nombre</label>
+                <label className="block text-xs font-medium text-zinc-600">Nombre del paciente</label>
                 <Input
                   {...register("nombre")}
                   className="mt-1"
@@ -900,22 +968,70 @@ export function AgendaDia() {
                 />
               </div>
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Unidades</label>
+                <label className="block text-xs font-medium text-zinc-600">Unidades *</label>
                 <Input
                   {...register("unidadesRequeridas")}
                   type="number"
                   min={1}
                   step={1}
+                  required
                   className="mt-1"
                 />
               </div>
-              <div className="hidden md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">Observaciones</label>
+              <div className="md:col-span-1">
+                <label className="block text-xs font-medium text-zinc-600">Total de Ciclos *</label>
+                <input type="hidden" {...register("totalCiclos")} />
                 <Input
-                  {...register("observaciones")}
                   className="mt-1"
-                  placeholder="Texto corto"
+                  value={`${totalCiclos}`}
+                  readOnly
                 />
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-xs font-medium text-zinc-600">Prescriptor</label>
+                <Input
+                  className="mt-1"
+                  list="prescriber-suggestions"
+                  placeholder="ESCRIBA PARA BUSCAR"
+                  {...register("prescriberTexto")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setValue("prescriberTexto", val);
+                    const match = prescribers.find((p) => personLabel(p) === val);
+                    setValue("prescriberId", match?.id);
+                  }}
+                  onBlur={() => {
+                    const val =
+                      (document.querySelector('input[name="prescriberTexto"]') as HTMLInputElement | null)?.value ??
+                      "";
+                    const match = prescribers.find((p) => personLabel(p) === val);
+                    setValue("prescriberId", match?.id);
+                  }}
+                />
+                <datalist id="prescriber-suggestions">
+                  {prescribers.map((p) => (
+                    <option key={p.id} value={personLabel(p)} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-zinc-600">Clave de Autorización</label>
+                <Input
+                  {...register("claveAutorizacion")}
+                  className="mt-1"
+                  placeholder="Opcional"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-zinc-600">Adquisición</label>
+                <Select className="mt-1" {...register("adquisicion")}>
+                  <option value="almacenable">ALMACENABLE</option>
+                  <option value="compra_local">COMPRA LOCAL</option>
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-zinc-600">Observaciones</label>
+                <Input {...register("observaciones")} className="mt-1" placeholder="Texto corto" />
               </div>
               <div className="md:col-span-3">
                 <label className="block text-xs font-medium text-zinc-600">
@@ -925,12 +1041,51 @@ export function AgendaDia() {
                   {applyDates.map((d, idx) => (
                     <div key={`${idx}-${d}`} className="flex items-center gap-2">
                       <Input
-                        type="date"
-                        value={d}
+                        inputMode="numeric"
+                        placeholder="dd/mm/aaaa"
+                        value={applyDateTexts[idx] ?? (d ? formatDMY(d) : "")}
                         onChange={(e) => {
-                          const next = [...applyDates];
-                          next[idx] = e.target.value;
-                          setApplyDates(next);
+                          const raw = e.target.value;
+                          setApplyDateTexts((prev) => {
+                            const next = [...prev];
+                            next[idx] = raw;
+                            return next;
+                          });
+
+                          if (!raw.trim()) {
+                            setApplyDates((prev) => {
+                              const next = [...prev];
+                              next[idx] = "";
+                              return next;
+                            });
+                            return;
+                          }
+
+                          const iso = parseDateInputToISO(raw);
+                          if (!iso) return;
+                          setApplyDates((prev) => {
+                            const next = [...prev];
+                            next[idx] = iso;
+                            return next;
+                          });
+                        }}
+                        onBlur={() => {
+                          const raw = applyDateTexts[idx] ?? "";
+                          if (!raw.trim()) return;
+                          const iso = parseDateInputToISO(raw);
+                          if (!iso) {
+                            setApplyDateTexts((prev) => {
+                              const next = [...prev];
+                              next[idx] = d ? formatDMY(d) : "";
+                              return next;
+                            });
+                            return;
+                          }
+                          setApplyDateTexts((prev) => {
+                            const next = [...prev];
+                            next[idx] = formatDMY(iso);
+                            return next;
+                          });
                         }}
                       />
                       <Button
@@ -939,6 +1094,7 @@ export function AgendaDia() {
                         className="px-3 py-2"
                         onClick={() => {
                           setApplyDates((prev) => prev.filter((_, i) => i !== idx));
+                          setApplyDateTexts((prev) => prev.filter((_, i) => i !== idx));
                         }}
                         disabled={applyDates.length <= 1}
                       >
@@ -951,8 +1107,9 @@ export function AgendaDia() {
                       variant="subtle"
                       type="button"
                       onClick={() => {
-                        setApplyDates((prev) =>
-                          prev.length >= 12 ? prev : [...prev, fechaStr],
+                        setApplyDates((prev) => (prev.length >= 12 ? prev : [...prev, fechaStr]));
+                        setApplyDateTexts((prev) =>
+                          prev.length >= 12 ? prev : [...prev, formatDMY(fechaStr)],
                         );
                       }}
                       disabled={applyDates.length >= 12}
@@ -962,33 +1119,44 @@ export function AgendaDia() {
                     <Button
                       variant="secondary"
                       type="button"
-                      onClick={() => setApplyDates([fechaStr])}
+                      onClick={() => {
+                        setApplyDates([fechaStr]);
+                        setApplyDateTexts([formatDMY(fechaStr)]);
+                      }}
                     >
                       Usar fecha seleccionada
                     </Button>
                   </div>
                 </div>
               </div>
-              <div className="hidden md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Frecuencia</label>
-                <Input
-                  {...register("frecuencia")}
-                  className="mt-1"
-                  placeholder="Ej: CADA 8H / SEMANAL"
-                />
-              </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Adquisición</label>
-                <Select className="mt-1" {...register("adquisicion")}>
-                  <option value="almacenable">ALMACENABLE</option>
-                  <option value="compra_local">COMPRA LOCAL</option>
-                </Select>
+                <label className="block text-xs font-medium text-zinc-600">Farmacéutico</label>
+                <Input
+                  className="mt-1"
+                  list="pharmacist-suggestions"
+                  placeholder="ESCRIBA PARA BUSCAR"
+                  {...register("pharmacistTexto")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setValue("pharmacistTexto", val);
+                    const match = pharmacists.find((p) => personLabel(p) === val);
+                    setValue("pharmacistId", match?.id);
+                  }}
+                  onBlur={() => {
+                    const val =
+                      (document.querySelector('input[name="pharmacistTexto"]') as HTMLInputElement | null)?.value ??
+                      "";
+                    const match = pharmacists.find((p) => personLabel(p) === val);
+                    setValue("pharmacistId", match?.id);
+                  }}
+                />
+                <datalist id="pharmacist-suggestions">
+                  {pharmacists.map((p) => (
+                    <option key={p.id} value={personLabel(p)} />
+                  ))}
+                </datalist>
               </div>
-              <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">Observaciones</label>
-                <Input {...register("observaciones")} className="mt-1" placeholder="Texto corto" />
-              </div>
-              <div className="md:col-span-4 flex items-end justify-end">
+              <div className="md:col-span-7 flex items-end justify-end">
                 <Button variant="primary" type="submit" disabled={formState.isSubmitting}>
                   Guardar
                 </Button>
@@ -996,6 +1164,9 @@ export function AgendaDia() {
             </form>
             {formState.errors.unidadesRequeridas ? (
               <div className="mt-2 text-sm text-rose-700">Unidades debe ser &gt; 0</div>
+            ) : null}
+            {formState.errors.totalCiclos ? (
+              <div className="mt-2 text-sm text-rose-700">Total de Ciclos debe ser &gt; 0</div>
             ) : null}
           </div>
         </div>

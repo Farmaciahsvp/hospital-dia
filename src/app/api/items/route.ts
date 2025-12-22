@@ -90,7 +90,13 @@ export async function GET(request: Request) {
       },
       include: {
         medication: true,
-        prepRequest: { include: { patient: true } },
+        prepRequest: {
+          include: {
+            patient: true,
+            prescriber: { select: { codigo: true } },
+            pharmacist: { select: { codigo: true } },
+          },
+        },
       },
       orderBy: [{ updatedAt: "desc" }],
       take: 500,
@@ -107,6 +113,8 @@ export async function GET(request: Request) {
         estado: i.estado,
         identificacion: i.prepRequest.patient.identificacion,
         nombre: i.prepRequest.patient.nombre,
+        prescriberCodigo: i.prepRequest.prescriber?.codigo ?? null,
+        pharmacistCodigo: i.prepRequest.pharmacist?.codigo ?? null,
         medicationId: i.medicationId,
         medicationCodigo: i.medication.codigoInstitucional ?? null,
         medicationNombre: i.medication.nombre,

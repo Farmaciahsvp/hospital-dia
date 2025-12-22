@@ -74,6 +74,7 @@ export type CalendarDayExportRow = {
   viaAdministracion: string | null;
   dosis: string;
   unidades: number;
+  prescriberCodigo: string | null;
 };
 
 export function exportCalendarDayPdf(
@@ -100,6 +101,7 @@ export function exportCalendarDayPdf(
         "DOSIS",
         "VIA ADMINISTRACION",
         "UNIDADES",
+        "COD. PRESCRIPTOR",
       ],
     ],
     body: rows.map((r) => [
@@ -111,6 +113,7 @@ export function exportCalendarDayPdf(
       r.dosis,
       r.viaAdministracion ?? "",
       String(r.unidades),
+      r.prescriberCodigo ?? "",
     ]),
     styles: { fontSize: 9, cellPadding: 2, halign: "center", valign: "middle" },
     headStyles: { fillColor: [24, 24, 27], halign: "center" },
@@ -120,7 +123,7 @@ export function exportCalendarDayPdf(
   const signatureY = Math.min(lastY + 24, doc.internal.pageSize.getHeight() - 70);
   doc.setFontSize(10);
   doc.text(
-    "DIGITADOR: ____________________    ACOPIADO POR: ____________________    ENTREGADO POR: ____________________    RECIBIDO POR: ____________________",
+    "DIGITADOR: ____________________    ACOPIADO POR: ____________________    FARMACÉUTICO: ____________________",
     14,
     signatureY,
   );

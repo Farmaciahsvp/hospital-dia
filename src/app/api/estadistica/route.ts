@@ -130,7 +130,7 @@ export async function GET(request: Request) {
       prisma.$queryRaw<Array<{ motivo: string | null; count: bigint }>>(Prisma.sql`
         SELECT COALESCE(i."canceladoMotivo",'SIN MOTIVO') AS motivo, COUNT(*)::bigint AS count
         FROM "public"."prep_request_items" i
-        JOIN "public"."prep_requests" pr ON pr."id" = i."prepRequestId"
+        JOIN "public"."prep_requests" pr ON pr."id"::text = i."prepRequestId"::text
         WHERE pr."fechaRecepcion" >= ${from} AND pr."fechaRecepcion" < ${toExclusive}
           AND i."estado" = 'cancelado'
         GROUP BY motivo
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
       prisma.$queryRaw<Array<{ id: string | null; lineas: bigint }>>(Prisma.sql`
         SELECT pr."pharmacistId" AS id, COUNT(i."id")::bigint AS lineas
         FROM "public"."prep_request_items" i
-        JOIN "public"."prep_requests" pr ON pr."id" = i."prepRequestId"
+        JOIN "public"."prep_requests" pr ON pr."id"::text = i."prepRequestId"::text
         WHERE pr."fechaRecepcion" >= ${from} AND pr."fechaRecepcion" < ${toExclusive}
         GROUP BY pr."pharmacistId"
         ORDER BY lineas DESC
@@ -149,7 +149,7 @@ export async function GET(request: Request) {
       prisma.$queryRaw<Array<{ id: string | null; lineas: bigint }>>(Prisma.sql`
         SELECT pr."prescriberId" AS id, COUNT(i."id")::bigint AS lineas
         FROM "public"."prep_request_items" i
-        JOIN "public"."prep_requests" pr ON pr."id" = i."prepRequestId"
+        JOIN "public"."prep_requests" pr ON pr."id"::text = i."prepRequestId"::text
         WHERE pr."fechaRecepcion" >= ${from} AND pr."fechaRecepcion" < ${toExclusive}
         GROUP BY pr."prescriberId"
         ORDER BY lineas DESC
@@ -161,7 +161,7 @@ export async function GET(request: Request) {
         WITH base AS (
           SELECT EXTRACT(EPOCH FROM (i."entregadoAt" - i."createdAt")) / 3600.0 AS hours
           FROM "public"."prep_request_items" i
-          JOIN "public"."prep_requests" pr ON pr."id" = i."prepRequestId"
+          JOIN "public"."prep_requests" pr ON pr."id"::text = i."prepRequestId"::text
           WHERE pr."fechaRecepcion" >= ${from} AND pr."fechaRecepcion" < ${toExclusive}
             AND i."entregadoAt" IS NOT NULL
         )
@@ -178,7 +178,7 @@ export async function GET(request: Request) {
                COUNT(DISTINCT pr."patientId")::bigint AS pacientes,
                COUNT(i."id")::bigint AS lineas
         FROM "public"."prep_requests" pr
-        JOIN "public"."prep_request_items" i ON i."prepRequestId" = pr."id"
+        JOIN "public"."prep_request_items" i ON i."prepRequestId"::text = pr."id"::text
         WHERE pr."finalizadoAt" IS NULL
           AND pr."fechaAplicacion" >= ${parseIsoDate(defaultTo)!}
           AND pr."fechaAplicacion" < ${addDays(parseIsoDate(defaultTo)!, 31)}

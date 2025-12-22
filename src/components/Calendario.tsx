@@ -27,6 +27,8 @@ type AgendaItem = {
   estado: string;
   identificacion: string;
   nombre: string | null;
+  prescriberCodigo?: string | null;
+  pharmacistCodigo?: string | null;
   medicationCodigo?: string | null;
   medicationNombre?: string;
   medicationViaAdministracion?: string | null;
@@ -148,6 +150,7 @@ export function Calendario() {
         viaAdministracion: it.medicationViaAdministracion ?? null,
         dosis: it.dosisTexto,
         unidades: it.unidadesRequeridas,
+        prescriberCodigo: it.prescriberCodigo ?? null,
       }))
       .sort((a, b) => {
         const byId = a.identificacion.localeCompare(b.identificacion);
