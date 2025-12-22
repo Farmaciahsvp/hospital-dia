@@ -1251,7 +1251,7 @@ export function AgendaDia() {
                       Usar fecha seleccionada
                     </Button>
                     <Button variant="secondary" type="button" onClick={suggestApplyDates}>
-                      Sugerir seg˙n frecuencia
+                      Sugerir según frecuencia
                     </Button>
                   </div>
                 </div>
