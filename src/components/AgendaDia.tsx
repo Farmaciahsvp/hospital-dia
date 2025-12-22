@@ -200,6 +200,49 @@ function parseDateInputToISO(raw: string): string | null {
   return null;
 }
 
+type FrequencyStep = { kind: "days"; value: number } | { kind: "months"; value: number };
+
+function parseFrequencyStep(raw: string | null | undefined): FrequencyStep | null {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+
+  const norm = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const cadaMatch = norm.match(/\bCADA\s+(\d+)\s*(H|HRS|HORAS|DIA|DIAS|SEMANA|SEMANAS|MES|MESES)\b/);
+  if (cadaMatch) {
+    const n = Number.parseInt(cadaMatch[1] ?? "", 10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const unit = cadaMatch[2] ?? "";
+    if (unit === "H" || unit === "HRS" || unit === "HORAS") return null;
+    if (unit === "DIA" || unit === "DIAS") return { kind: "days", value: n };
+    if (unit === "SEMANA" || unit === "SEMANAS") return { kind: "days", value: n * 7 };
+    if (unit === "MES" || unit === "MESES") return { kind: "months", value: n };
+  }
+
+  if (/\bDIARIO\b|\bDIARIA\b/.test(norm)) return { kind: "days", value: 1 };
+  if (/\bSEMANAL\b/.test(norm)) return { kind: "days", value: 7 };
+  if (/\bQUINCENAL\b/.test(norm)) return { kind: "days", value: 15 };
+  if (/\bMENSUAL\b/.test(norm)) return { kind: "months", value: 1 };
+  if (/\bBIMENSUAL\b/.test(norm)) return { kind: "months", value: 2 };
+  if (/\bTRIMESTRAL\b/.test(norm)) return { kind: "months", value: 3 };
+  if (/\bANUAL\b/.test(norm)) return { kind: "months", value: 12 };
+
+  return null;
+}
+
+function isoToUtcDate(iso: string) {
+  return new Date(`${iso}T00:00:00.000Z`);
+}
+
+function addMonthsUtc(date: Date, months: number) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
+}
+
 export function AgendaDia() {
   useRouter();
   const [fecha, setFecha] = useState(() => new Date());
@@ -551,6 +594,45 @@ export function AgendaDia() {
       quickSubmitInFlightRef.current = false;
     }
   });
+
+  const suggestApplyDates = useCallback(() => {
+    const step = parseFrequencyStep(getValues("frecuencia"));
+    if (!step) {
+      setToast({
+        kind: "error",
+        message: 'No pude interpretar "Frecuencia". Ej: "CADA 21 DIAS", "SEMANAL", "MENSUAL".',
+      });
+      return;
+    }
+
+    const requested = Number(getValues("totalCiclos") ?? applyDates.length);
+    const count = Math.max(1, Math.min(MAX_APPLY_DATES, Number.isFinite(requested) ? requested : applyDates.length));
+    const startIso = applyDates[0] || fechaStr;
+    const start = isoToUtcDate(startIso);
+    if (Number.isNaN(start.getTime())) {
+      setToast({ kind: "error", message: "Fecha inicial inválida" });
+      return;
+    }
+
+    if (applyDates.length > 1) {
+      const ok = window.confirm("Esto reemplazará las fechas actuales. ¿Desea continuar?");
+      if (!ok) return;
+    }
+
+    const dates: string[] = [];
+    let current = start;
+    for (let i = 0; i < count; i++) {
+      dates.push(current.toISOString().slice(0, 10));
+      current =
+        step.kind === "days"
+          ? new Date(current.getTime() + step.value * 24 * 60 * 60 * 1000)
+          : addMonthsUtc(current, step.value);
+    }
+
+    setApplyDates(dates);
+    setApplyDateTexts(dates.map((d) => formatDMY(d)));
+    setValue("totalCiclos", dates.length, { shouldValidate: true });
+  }, [applyDates, fechaStr, getValues, setValue]);
 
   const toggleStatus = useCallback((s: ItemStatus) => {
     setStatusFilter((prev) => {
@@ -1167,6 +1249,9 @@ export function AgendaDia() {
                       }}
                     >
                       Usar fecha seleccionada
+                    </Button>
+                    <Button variant="secondary" type="button" onClick={suggestApplyDates}>
+                      Sugerir seg˙n frecuencia
                     </Button>
                   </div>
                 </div>
