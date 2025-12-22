@@ -86,6 +86,8 @@ type PersonOption = {
   apellidos: string;
 };
 
+const MAX_APPLY_DATES = 16;
+
   const quickSchema = z.object({
     fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     numeroReceta: z
@@ -104,7 +106,7 @@ type PersonOption = {
     medicamentoTexto: z.string().trim().min(1),
     dosisTexto: z.string().trim().min(1),
     unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
-    totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive()).optional(),
+    totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive().max(MAX_APPLY_DATES)),
     frecuencia: z.string().trim().max(50).optional(),
     adquisicion: z.enum(["almacenable", "compra_local"]).default("almacenable"),
     observaciones: z.string().trim().max(300).optional(),
@@ -356,7 +358,7 @@ export function AgendaDia() {
     return Array.from(map.values()).sort((a, b) => a.identificacion.localeCompare(b.identificacion));
   }, [items]);
 
-  const { register, handleSubmit, setValue, reset, formState } = useForm<QuickForm>({
+  const { register, handleSubmit, setValue, reset, formState, getValues } = useForm<QuickForm>({
     resolver: zodResolver(quickSchema),
     defaultValues: {
       fechaRecepcion: fechaStr,
@@ -378,14 +380,15 @@ export function AgendaDia() {
     },
   });
 
+  const totalCiclosField = register("totalCiclos");
+
   const quickIdentRef = useRef<HTMLInputElement | null>(null);
   const quickRecetaRef = useRef<HTMLInputElement | null>(null);
   const quickFormRef = useRef<HTMLFormElement | null>(null);
 
-  const totalCiclos = useMemo(() => new Set(applyDates.filter(Boolean)).size, [applyDates]);
   useEffect(() => {
-    setValue("totalCiclos", totalCiclos, { shouldValidate: true });
-  }, [setValue, totalCiclos]);
+    setValue("totalCiclos", applyDates.length, { shouldValidate: true, shouldDirty: false });
+  }, [setValue, applyDates.length]);
 
   const focusNextQuickField = useCallback((current: HTMLElement, direction: 1 | -1) => {
     const form = quickFormRef.current;
@@ -476,7 +479,7 @@ export function AgendaDia() {
 
   const onQuickSubmit = handleSubmit(async (values) => {
     try {
-      const fechasAplicacion = Array.from(new Set(applyDates.filter(Boolean))).slice(0, 12);
+      const fechasAplicacion = Array.from(new Set(applyDates.filter(Boolean))).slice(0, MAX_APPLY_DATES);
       if (!fechasAplicacion.length) throw new Error("Debe indicar al menos una fecha de aplicación");
       const res = await fetch("/api/items", {
         method: "POST",
@@ -980,11 +983,43 @@ export function AgendaDia() {
               </div>
               <div className="md:col-span-1">
                 <label className="block text-xs font-medium text-zinc-600">Total de Ciclos *</label>
-                <input type="hidden" {...register("totalCiclos")} />
                 <Input
+                  {...totalCiclosField}
+                  type="number"
+                  min={1}
+                  max={MAX_APPLY_DATES}
+                  step={1}
                   className="mt-1"
-                  value={`${totalCiclos}`}
-                  readOnly
+                  onChange={(e) => {
+                    totalCiclosField.onChange(e);
+                    const raw = e.target.value;
+                    const parsed = Number.parseInt(raw, 10);
+                    if (!Number.isFinite(parsed)) return;
+
+                    const nextCount = Math.max(1, Math.min(MAX_APPLY_DATES, parsed));
+                    if (parsed !== nextCount) setValue("totalCiclos", nextCount, { shouldValidate: true });
+                    const currentCount = applyDates.length;
+                    if (nextCount === currentCount) return;
+
+                    if (nextCount > currentCount) {
+                      const toAdd = nextCount - currentCount;
+                      setApplyDates((prev) => [...prev, ...Array.from({ length: toAdd }, () => fechaStr)]);
+                      setApplyDateTexts((prev) => [
+                        ...prev,
+                        ...Array.from({ length: toAdd }, () => formatDMY(fechaStr)),
+                      ]);
+                      return;
+                    }
+
+                    setApplyDates((prev) => prev.slice(0, nextCount));
+                    setApplyDateTexts((prev) => prev.slice(0, nextCount));
+                  }}
+                  onBlur={(e) => {
+                    totalCiclosField.onBlur(e);
+                    const v = getValues("totalCiclos");
+                    const nextCount = Math.max(1, Math.min(MAX_APPLY_DATES, Number(v)));
+                    if (Number.isFinite(nextCount)) setValue("totalCiclos", nextCount, { shouldValidate: true });
+                  }}
                 />
               </div>
               <div className="md:col-span-3">
@@ -1035,7 +1070,7 @@ export function AgendaDia() {
               </div>
               <div className="md:col-span-3">
                 <label className="block text-xs font-medium text-zinc-600">
-                  Fechas de aplicación (máx. 12)
+                  Fechas de aplicación (máx. 16)
                 </label>
                 <div className="mt-1 flex flex-col gap-2">
                   {applyDates.map((d, idx) => (
@@ -1107,12 +1142,14 @@ export function AgendaDia() {
                       variant="subtle"
                       type="button"
                       onClick={() => {
-                        setApplyDates((prev) => (prev.length >= 12 ? prev : [...prev, fechaStr]));
+                        setApplyDates((prev) =>
+                          prev.length >= MAX_APPLY_DATES ? prev : [...prev, fechaStr],
+                        );
                         setApplyDateTexts((prev) =>
-                          prev.length >= 12 ? prev : [...prev, formatDMY(fechaStr)],
+                          prev.length >= MAX_APPLY_DATES ? prev : [...prev, formatDMY(fechaStr)],
                         );
                       }}
-                      disabled={applyDates.length >= 12}
+                      disabled={applyDates.length >= MAX_APPLY_DATES}
                     >
                       + Agregar fecha
                     </Button>
@@ -1717,7 +1754,7 @@ export function AgendaDia() {
                 onClick={async () => {
                   if (!editUltimo) return;
                   try {
-                    const fechasAplicacion = Array.from(new Set(editDates.filter(Boolean))).slice(0, 12);
+                    const fechasAplicacion = Array.from(new Set(editDates.filter(Boolean))).slice(0, MAX_APPLY_DATES);
                     if (!fechasAplicacion.length) throw new Error("Debe indicar al menos una fecha de aplicación");
                     const res = await fetch(`/api/ultimos-registros/${editUltimo.id}`, {
                       method: "PATCH",
@@ -1918,7 +1955,7 @@ export function AgendaDia() {
               </Select>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-zinc-600">FECHAS DE APLICACIÓN (MÁX. 12)</label>
+              <label className="block text-xs font-medium text-zinc-600">FECHAS DE APLICACIÓN (MÁX. 16)</label>
               <div className="mt-1 flex flex-wrap gap-2">
                 {editDates.map((d) => (
                   <span
@@ -1943,7 +1980,9 @@ export function AgendaDia() {
                   onChange={(e) => {
                     const raw = e.target.value;
                     if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
-                    setEditDates((prev) => (prev.includes(raw) ? prev : [...prev, raw].slice(0, 12)));
+                    setEditDates((prev) =>
+                      prev.includes(raw) ? prev : [...prev, raw].slice(0, MAX_APPLY_DATES),
+                    );
                   }}
                 />
                 <Button
@@ -1951,7 +1990,9 @@ export function AgendaDia() {
                   type="button"
                   onClick={() => {
                     const raw = fechaStr;
-                    setEditDates((prev) => (prev.includes(raw) ? prev : [...prev, raw].slice(0, 12)));
+                    setEditDates((prev) =>
+                      prev.includes(raw) ? prev : [...prev, raw].slice(0, MAX_APPLY_DATES),
+                    );
                   }}
                 >
                   USAR FECHA DE AGENDA
