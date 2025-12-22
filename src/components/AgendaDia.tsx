@@ -385,6 +385,7 @@ export function AgendaDia() {
   const quickIdentRef = useRef<HTMLInputElement | null>(null);
   const quickRecetaRef = useRef<HTMLInputElement | null>(null);
   const quickFormRef = useRef<HTMLFormElement | null>(null);
+  const quickSubmitInFlightRef = useRef(false);
 
   useEffect(() => {
     setValue("totalCiclos", applyDates.length, { shouldValidate: true, shouldDirty: false });
@@ -478,6 +479,8 @@ export function AgendaDia() {
   }, [loadUltimos]);
 
   const onQuickSubmit = handleSubmit(async (values) => {
+    if (quickSubmitInFlightRef.current) return;
+    quickSubmitInFlightRef.current = true;
     try {
       const fechasAplicacion = Array.from(new Set(applyDates.filter(Boolean))).slice(0, MAX_APPLY_DATES);
       if (!fechasAplicacion.length) throw new Error("Debe indicar al menos una fecha de aplicación");
@@ -544,6 +547,8 @@ export function AgendaDia() {
       quickIdentRef.current?.focus();
     } catch (e) {
       setToast({ kind: "error", message: e instanceof Error ? e.message : "Error" });
+    } finally {
+      quickSubmitInFlightRef.current = false;
     }
   });
 

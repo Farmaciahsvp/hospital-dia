@@ -5,6 +5,8 @@ import { ItemStatus } from "@prisma/client";
 import { getRequestId } from "@/lib/api-server";
 
 const MED_CODE_RE = /^\d-\d{2}-\d{2}-\d{4}$/;
+const MAX_APPLY_DATES = 16;
+const DUPLICATE_WINDOW_MS = 2000;
 
 function parseDateParam(raw: string | null) {
   if (!raw) return null;
@@ -171,7 +173,10 @@ export async function GET(request: Request) {
 
 const createItemSchema = z.object({
   fechaAplicacion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  fechasAplicacion: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(12).optional(),
+  fechasAplicacion: z
+    .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+    .max(MAX_APPLY_DATES)
+    .optional(),
   fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   numeroReceta: z.string().regex(/^\d{6}$/).nullable().optional(),
   prescriberId: z.string().uuid().nullable().optional(),
@@ -207,8 +212,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (uniqueRawDates.length > 12) {
-    return NextResponse.json({ error: "Máximo 12 fechas" }, { status: 400 });
+  if (uniqueRawDates.length > MAX_APPLY_DATES) {
+    return NextResponse.json({ error: `Máximo ${MAX_APPLY_DATES} fechas` }, { status: 400 });
   }
   const fechas = uniqueRawDates
     .map((d) => parseDateParam(d))
@@ -261,6 +266,12 @@ export async function POST(request: Request) {
       ).id;
   }
 
+  const normalizedDosis = body.dosisTexto.toUpperCase();
+  const normalizedFrecuencia = body.frecuencia ? body.frecuencia.toUpperCase() : null;
+  const normalizedAdquisicion = body.adquisicion ?? "almacenable";
+  const normalizedObservaciones = body.observaciones ?? null;
+  const duplicateSince = new Date(Date.now() - DUPLICATE_WINDOW_MS);
+
   const ids = await prisma.$transaction(async (tx) => {
     const createdIds: string[] = [];
     for (const fecha of fechas) {
@@ -285,16 +296,35 @@ export async function POST(request: Request) {
         },
       });
 
+      const existing = await tx.prepRequestItem.findFirst({
+        where: {
+          prepRequestId: prepRequest.id,
+          medicationId,
+          dosisTexto: normalizedDosis,
+          unidadesRequeridas: body.unidadesRequeridas,
+          frecuencia: normalizedFrecuencia,
+          adquisicion: normalizedAdquisicion,
+          observaciones: normalizedObservaciones,
+          createdAt: { gte: duplicateSince },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (existing) {
+        createdIds.push(existing.id);
+        continue;
+      }
+
       const item = await tx.prepRequestItem.create({
         data: {
           prepRequestId: prepRequest.id,
           medicationId,
-          dosisTexto: body.dosisTexto.toUpperCase(),
+          dosisTexto: normalizedDosis,
           unidadesRequeridas: body.unidadesRequeridas,
           estado: "pendiente",
-          frecuencia: body.frecuencia ? body.frecuencia.toUpperCase() : null,
-          adquisicion: body.adquisicion ?? "almacenable",
-          observaciones: body.observaciones ?? null,
+          frecuencia: normalizedFrecuencia,
+          adquisicion: normalizedAdquisicion,
+          observaciones: normalizedObservaciones,
           createdBy: body.createdBy ?? null,
           updatedBy: body.createdBy ?? null,
         },
