@@ -1,6 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
 
+function parseMonthParam(raw: string | null) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!/^\d{4}-\d{2}$/.test(trimmed)) return null;
+
+  const [yearStr, monthStr] = trimmed.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 1));
+  return { start, end };
+}
+
 type RecordRow = {
   id: string;
   patientId: string;
@@ -26,9 +41,24 @@ export async function GET(request: Request) {
   const requestId = getRequestId(request);
   try {
     const url = new URL(request.url);
-    const take = Math.min(Math.max(Number(url.searchParams.get("take") ?? 5), 1), 20);
+    const monthRange = parseMonthParam(url.searchParams.get("month"));
+    const takeRaw = url.searchParams.get("take");
+    const take = takeRaw ? Math.min(Math.max(Number(takeRaw), 1), 5000) : null;
+    const effectiveTake = take ?? (monthRange ? null : 5);
 
     const items = await prisma.prepRequestItem.findMany({
+      where: monthRange
+        ? {
+            prepRequest: {
+              is: {
+                OR: [
+                  { fechaRecepcion: { gte: monthRange.start, lt: monthRange.end } },
+                  { fechaRecepcion: null, createdAt: { gte: monthRange.start, lt: monthRange.end } },
+                ],
+              },
+            },
+          }
+        : undefined,
       include: {
         medication: true,
         prepRequest: {
@@ -38,7 +68,7 @@ export async function GET(request: Request) {
         },
       },
       orderBy: [{ createdAt: "desc" }],
-      take: 250,
+      ...(monthRange ? {} : { take: 250 }),
     });
 
     const grouped = new Map<string, RecordRow & { sortAt: string }>();
@@ -102,15 +132,19 @@ export async function GET(request: Request) {
       grouped.set(key, current);
     }
 
-    const rows = Array.from(grouped.values())
+    const sortedRows = Array.from(grouped.values())
       .sort((a, b) => b.sortAt.localeCompare(a.sortAt))
-      .slice(0, take)
-      .map(({ sortAt: _sortAt, ...rest }) => ({
-        ...rest,
-        fechasAplicacion: Array.from(new Set(rest.fechasAplicacion)).sort(),
-        itemIds: Array.from(new Set(rest.itemIds)),
-      }));
+      .map((row) => {
+        const { sortAt, ...rest } = row;
+        void sortAt;
+        return {
+          ...rest,
+          fechasAplicacion: Array.from(new Set(rest.fechasAplicacion)).sort(),
+          itemIds: Array.from(new Set(rest.itemIds)),
+        };
+      });
 
+    const rows = effectiveTake ? sortedRows.slice(0, effectiveTake) : sortedRows;
     return jsonOk(requestId, { rows });
   } catch (e) {
     console.error({ requestId, route: "GET /api/ultimos-registros", error: e });

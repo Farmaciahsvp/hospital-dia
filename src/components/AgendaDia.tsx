@@ -118,6 +118,14 @@ function personLabel(p: PersonOption) {
   return `${p.codigo} - ${p.nombres} ${p.apellidos}`.trim();
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function toMonthInputValue(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+}
+
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -279,6 +287,7 @@ export function AgendaDia() {
   const [pharmacists, setPharmacists] = useState<PersonOption[]>([]);
 
   const [ultimos, setUltimos] = useState<UltimoRegistro[]>([]);
+  const [ultimosMonth, setUltimosMonth] = useState(() => toMonthInputValue(new Date()));
   const [loadingUltimos, setLoadingUltimos] = useState(false);
   const [editUltimo, setEditUltimo] = useState<UltimoRegistro | null>(null);
   const [editDates, setEditDates] = useState<string[]>([]);
@@ -505,7 +514,9 @@ export function AgendaDia() {
   const loadUltimos = useCallback(async () => {
     setLoadingUltimos(true);
     try {
-      const res = await fetch("/api/ultimos-registros?take=5", { cache: "no-store" });
+      const url = new URL("/api/ultimos-registros", window.location.origin);
+      if (ultimosMonth) url.searchParams.set("month", ultimosMonth);
+      const res = await fetch(url.toString(), { cache: "no-store" });
       const data = (await res.json()) as { rows?: UltimoRegistro[]; error?: string };
       if (!res.ok) throw new Error(data.error || "No se pudo cargar");
       setUltimos(data.rows ?? []);
@@ -515,7 +526,7 @@ export function AgendaDia() {
     } finally {
       setLoadingUltimos(false);
     }
-  }, []);
+  }, [ultimosMonth]);
 
   useEffect(() => {
     void loadUltimos();
@@ -1342,18 +1353,29 @@ export function AgendaDia() {
         <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
           <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
             <div>
-              <div className="text-sm font-semibold text-zinc-900">ÚLTIMOS 5 PACIENTES REGISTRADOS</div>
+              <div className="text-sm font-semibold text-zinc-900">PACIENTES REGISTRADOS</div>
               <div className="text-xs text-zinc-500">EDICIÓN COMPLETA (INCLUYE FECHAS DE APLICACIÓN)</div>
             </div>
-            <Button
-              variant="secondary"
-              type="button"
-              className="py-1.5"
-              onClick={() => void loadUltimos()}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              ACTUALIZAR
-            </Button>
+            <div className="flex items-end gap-2">
+              <div className="w-40">
+                <label className="block text-[11px] font-medium text-zinc-600">MES</label>
+                <Input
+                  className="mt-1 py-1.5"
+                  type="month"
+                  value={ultimosMonth}
+                  onChange={(e) => setUltimosMonth(e.target.value)}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                type="button"
+                className="py-1.5"
+                onClick={() => void loadUltimos()}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                ACTUALIZAR
+              </Button>
+            </div>
           </div>
           <div className="overflow-auto">
             <table className="min-w-full text-center text-sm text-blue-950">
