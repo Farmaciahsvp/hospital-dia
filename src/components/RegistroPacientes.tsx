@@ -9,6 +9,7 @@ import { fetchJson } from "@/lib/api-client";
 
 type Row = {
   patientId: string;
+  medicationId: string;
   fechaRecepcion: string | null;
   numeroReceta: string | null;
   cedula: string;
@@ -25,6 +26,8 @@ function formatDMY(dateStr: string) {
   return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
 }
 
+const aplicacionesStorageKey = "hd_aplicaciones_cumplidas_v1";
+
 export function RegistroPacientes() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +36,7 @@ export function RegistroPacientes() {
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const [total, setTotal] = useState(0);
+  const [aplicacionesCumplidas, setAplicacionesCumplidas] = useState<Set<string>>(() => new Set());
 
   const [toDelete, setToDelete] = useState<{
     patientId: string;
@@ -69,6 +73,38 @@ export function RegistroPacientes() {
   }, [page]);
 
   const filtered = useMemo(() => rows, [rows]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(aplicacionesStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
+        setAplicacionesCumplidas(new Set(parsed));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function getAplicacionKey(row: Row, fechaIso: string) {
+    return [row.patientId, row.medicationId, row.dosis, row.numeroReceta ?? "", fechaIso].join("|");
+  }
+
+  function toggleAplicacionCumplida(row: Row, fechaIso: string) {
+    const k = getAplicacionKey(row, fechaIso);
+    setAplicacionesCumplidas((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      try {
+        window.localStorage.setItem(aplicacionesStorageKey, JSON.stringify(Array.from(next)));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -143,7 +179,34 @@ export function RegistroPacientes() {
                   <td className="px-3 py-2 text-center">{r.medicamento}</td>
                   <td className="px-3 py-2 text-center">{r.dosis}</td>
                   <td className="px-3 py-2 text-center">
-                    {r.fechasAplicacion.length ? r.fechasAplicacion.map(formatDMY).join(", ") : "-"}
+                    {r.fechasAplicacion.length ? (
+                      <div className="flex flex-wrap justify-center gap-x-1 gap-y-0.5">
+                        {r.fechasAplicacion.map((iso, i) => {
+                          const key = getAplicacionKey(r, iso);
+                          const cumplida = aplicacionesCumplidas.has(key);
+                          return (
+                            <span key={iso} className="whitespace-nowrap">
+                              <button
+                                type="button"
+                                className={[
+                                  "rounded px-1",
+                                  "underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+                                  cumplida ? "text-emerald-700" : "text-blue-950",
+                                ].join(" ")}
+                                aria-pressed={cumplida}
+                                title={cumplida ? "APLICACIÓN CUMPLIDA (CLICK PARA DESMARCAR)" : "CLICK PARA MARCAR COMO CUMPLIDA"}
+                                onClick={() => toggleAplicacionCumplida(r, iso)}
+                              >
+                                {formatDMY(iso)}
+                              </button>
+                              {i < r.fechasAplicacion.length - 1 ? <span className="text-zinc-400">, </span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td className="px-3 py-2 text-center">{r.farmaceutico ?? "-"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-center">

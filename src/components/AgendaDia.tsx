@@ -1357,7 +1357,7 @@ export function AgendaDia() {
               <div className="text-xs text-zinc-500">EDICIÓN COMPLETA (INCLUYE FECHAS DE APLICACIÓN)</div>
             </div>
             <div className="flex items-end gap-2">
-              <div className="w-40">
+              <div className="w-56">
                 <label className="block text-[11px] font-medium text-zinc-600">MES</label>
                 <Input
                   className="mt-1 py-1.5"

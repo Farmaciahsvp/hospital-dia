@@ -3,6 +3,7 @@ import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
 
 type Row = {
   patientId: string;
+  medicationId: string;
   fechaRecepcion: string | null;
   numeroReceta: string | null;
   cedula: string;
@@ -105,6 +106,7 @@ export async function GET(request: Request) {
         grouped.get(key) ??
         ({
           patientId: patient.id,
+          medicationId: it.medicationId,
           fechaRecepcion,
           numeroReceta,
           cedula: patient.identificacion,
