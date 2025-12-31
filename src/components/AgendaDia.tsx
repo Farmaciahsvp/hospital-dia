@@ -1044,12 +1044,21 @@ export function AgendaDia() {
                   className="mt-1"
                   placeholder="nombre / código"
                   onChange={(e) => {
-                    setValue("medicamentoTexto", e.target.value, { shouldValidate: true });
+                    const raw = e.target.value;
+                    setValue("medicamentoTexto", raw, { shouldValidate: true });
+
+                    const match = medSuggestions.find((m) => m.label === raw || m.nombre === raw);
+                    if (match) {
+                      setValue("medicamentoId", match.id, { shouldValidate: true });
+                      setValue("medicamentoTexto", match.nombre, { shouldValidate: true });
+                      return;
+                    }
+
                     setValue("medicamentoId", "", { shouldValidate: true });
-                    void loadMedSuggestions(e.target.value);
+                    void loadMedSuggestions(raw);
                   }}
                   onBlur={() => {
-                    const val = (document.querySelector('input[name="medicamentoTexto"]') as HTMLInputElement | null)?.value;
+                    const val = getValues("medicamentoTexto");
                     const match = medSuggestions.find((m) => m.label === val || m.nombre === val);
                     if (match) {
                       setValue("medicamentoId", match.id, { shouldValidate: true });
