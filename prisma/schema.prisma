@@ -107,6 +107,7 @@ model PrepRequestItem {
   adquisicion        AcquisitionType @default(almacenable)
   observaciones     String?
   entregadoAt       DateTime?
+  aplicadoAt        DateTime?
   canceladoMotivo   String?
   createdBy         String?
   updatedBy         String?

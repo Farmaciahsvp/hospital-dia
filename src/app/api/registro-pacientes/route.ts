@@ -11,6 +11,7 @@ type Row = {
   medicamento: string;
   dosis: string;
   fechasAplicacion: string[];
+  fechasAplicacionCumplidas: string[];
   farmaceutico: string | null;
 };
 
@@ -114,16 +115,20 @@ export async function GET(request: Request) {
           medicamento,
           dosis: it.dosisTexto,
           fechasAplicacion: [],
+          fechasAplicacionCumplidas: [],
           farmaceutico,
         } satisfies Row);
 
-      existing.fechasAplicacion.push(pr.fechaAplicacion.toISOString().slice(0, 10));
+      const fechaAplicacionIso = pr.fechaAplicacion.toISOString().slice(0, 10);
+      existing.fechasAplicacion.push(fechaAplicacionIso);
+      if (it.aplicadoAt) existing.fechasAplicacionCumplidas.push(fechaAplicacionIso);
       grouped.set(key, existing);
     }
 
     const allRows = Array.from(grouped.values()).map((r) => ({
       ...r,
       fechasAplicacion: Array.from(new Set(r.fechasAplicacion)).sort(),
+      fechasAplicacionCumplidas: Array.from(new Set(r.fechasAplicacionCumplidas)).sort(),
     }));
 
     allRows.sort((a, b) => {

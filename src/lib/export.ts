@@ -89,8 +89,37 @@ export function exportCalendarDayPdf(
   doc.setFontSize(11);
   doc.text(dayLabel, 14, 30);
 
+  function drawFooter() {
+    const marginX = 14;
+    const gap = 10;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    const footerY = pageHeight - 14;
+    const available = pageWidth - marginX * 2;
+    const colWidth = (available - gap * 2) / 3;
+
+    doc.setFontSize(10);
+
+    const labels = ["DIGITADOR:", "ACOPIADO POR:", "FARMACÉUTICO:"] as const;
+    for (let i = 0; i < labels.length; i++) {
+      const x = marginX + i * (colWidth + gap);
+      const label = labels[i];
+      doc.text(label, x, footerY);
+
+      const labelW = doc.getTextWidth(label);
+      const lineStart = x + labelW + 2;
+      const lineEnd = x + colWidth;
+      if (lineEnd > lineStart + 8) {
+        doc.setLineWidth(0.2);
+        doc.line(lineStart, footerY + 1, lineEnd, footerY + 1);
+      }
+    }
+  }
+
   autoTable(doc, {
     startY: 40,
+    margin: { left: 14, right: 14, bottom: 22 },
     head: [
       [
         "CEDULA",
@@ -117,10 +146,13 @@ export function exportCalendarDayPdf(
     ]),
     styles: { fontSize: 9, cellPadding: 2, halign: "center", valign: "middle" },
     headStyles: { fillColor: [24, 24, 27], halign: "center" },
+    didDrawPage: () => {
+      drawFooter();
+    },
   });
 
   const lastY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 40;
-  const signatureY = Math.min(lastY + 24, doc.internal.pageSize.getHeight() - 70);
+  const signatureY = doc.internal.pageSize.getHeight() + 1000 + lastY;
   doc.setFontSize(10);
   doc.text(
     "DIGITADOR: ____________________    ACOPIADO POR: ____________________    FARMACÉUTICO: ____________________",

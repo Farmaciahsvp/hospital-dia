@@ -17,6 +17,7 @@ type Row = {
   medicamento: string;
   dosis: string;
   fechasAplicacion: string[];
+  fechasAplicacionCumplidas: string[];
   farmaceutico: string | null;
 };
 
@@ -25,8 +26,6 @@ function formatDMY(dateStr: string) {
   if (!y || !m || !d) return dateStr;
   return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
 }
-
-const aplicacionesStorageKey = "hd_aplicaciones_cumplidas_v1";
 
 export function RegistroPacientes() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -58,6 +57,14 @@ export function RegistroPacientes() {
       const data = await fetchJson<{ rows: Row[]; total: number }>(url.toString(), { cache: "no-store" });
       setRows(data.rows ?? []);
       setTotal(data.total ?? 0);
+
+      const nextCumplidas = new Set<string>();
+      for (const r of data.rows ?? []) {
+        for (const iso of r.fechasAplicacionCumplidas ?? []) {
+          nextCumplidas.add(getAplicacionKey(r, iso));
+        }
+      }
+      setAplicacionesCumplidas(nextCumplidas);
     } catch (e) {
       setRows([]);
       setTotal(0);
@@ -74,36 +81,48 @@ export function RegistroPacientes() {
 
   const filtered = useMemo(() => rows, [rows]);
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(aplicacionesStorageKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
-        setAplicacionesCumplidas(new Set(parsed));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   function getAplicacionKey(row: Row, fechaIso: string) {
     return [row.patientId, row.medicationId, row.dosis, row.numeroReceta ?? "", fechaIso].join("|");
   }
 
-  function toggleAplicacionCumplida(row: Row, fechaIso: string) {
+  async function toggleAplicacionCumplida(row: Row, fechaIso: string) {
     const k = getAplicacionKey(row, fechaIso);
+    const was = aplicacionesCumplidas.has(k);
+
     setAplicacionesCumplidas((prev) => {
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
       else next.add(k);
-      try {
-        window.localStorage.setItem(aplicacionesStorageKey, JSON.stringify(Array.from(next)));
-      } catch {
-        // ignore
-      }
       return next;
     });
+
+    try {
+      const res = await fetchJson<{ applied: boolean }>("/api/registro-pacientes/aplicacion", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          patientId: row.patientId,
+          medicationId: row.medicationId,
+          dosisTexto: row.dosis,
+          fechaAplicacion: fechaIso,
+        }),
+      });
+
+      setAplicacionesCumplidas((prev) => {
+        const next = new Set(prev);
+        if (res.applied) next.add(k);
+        else next.delete(k);
+        return next;
+      });
+    } catch (e) {
+      setAplicacionesCumplidas((prev) => {
+        const next = new Set(prev);
+        if (was) next.add(k);
+        else next.delete(k);
+        return next;
+      });
+      setError(e instanceof Error ? e.message : "Error");
+    }
   }
 
   useEffect(() => {
@@ -195,7 +214,7 @@ export function RegistroPacientes() {
                                 ].join(" ")}
                                 aria-pressed={cumplida}
                                 title={cumplida ? "APLICACIÓN CUMPLIDA (CLICK PARA DESMARCAR)" : "CLICK PARA MARCAR COMO CUMPLIDA"}
-                                onClick={() => toggleAplicacionCumplida(r, iso)}
+                                onClick={() => void toggleAplicacionCumplida(r, iso)}
                               >
                                 {formatDMY(iso)}
                               </button>
