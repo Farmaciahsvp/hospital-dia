@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { ItemStatus } from "@prisma/client";
 import { getRequestId } from "@/lib/api-server";
 
-const MED_CODE_RE = /^\d-\d{2}-\d{2}-\d{4}$/;
 const MAX_APPLY_DATES = 16;
 const DUPLICATE_WINDOW_MS = 2000;
 
@@ -13,34 +12,6 @@ function parseDateParam(raw: string | null) {
   const date = new Date(`${raw}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return null;
   return date;
-}
-
-function parseMedicationInput(input: {
-  codigoInstitucional?: string | null;
-  nombre: string;
-}) {
-  const rawCode = input.codigoInstitucional?.trim() || null;
-  let rawName = input.nombre.trim();
-
-  if (!rawCode) {
-    const parts = rawName.split(" - ").map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2 && MED_CODE_RE.test(parts[0])) {
-      rawName = parts.slice(1).join(" - ").trim();
-      return { codigoInstitucional: parts[0].toUpperCase(), nombre: rawName.toUpperCase() };
-    }
-  }
-
-  if (rawCode) {
-    const prefix = `${rawCode} - `.toUpperCase();
-    if (rawName.toUpperCase().startsWith(prefix)) {
-      rawName = rawName.slice(prefix.length).trim();
-    }
-  }
-
-  return {
-    codigoInstitucional: rawCode ? rawCode.toUpperCase() : null,
-    nombre: rawName.toUpperCase(),
-  };
 }
 
 export async function GET(request: Request) {
@@ -177,23 +148,23 @@ const createItemSchema = z.object({
     .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
     .max(MAX_APPLY_DATES)
     .optional(),
-  fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  numeroReceta: z.string().regex(/^\d{6}$/).nullable().optional(),
-  prescriberId: z.string().uuid().nullable().optional(),
-  pharmacistId: z.string().uuid().nullable().optional(),
+  fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  numeroReceta: z.string().regex(/^\d{6}$/),
+  prescriberId: z.string().uuid(),
+  pharmacistId: z.string().uuid(),
   patient: z.object({
     identificacion: z.string().trim().min(1),
-    nombre: z.string().trim().min(1).nullable().optional(),
+    nombre: z.string().trim().min(1),
   }),
   medication: z.object({
-    id: z.string().uuid().optional(),
+    id: z.string().uuid(),
     codigoInstitucional: z.string().trim().min(1).nullable().optional(),
     nombre: z.string().trim().min(1),
   }),
   dosisTexto: z.string().trim().min(1),
   unidadesRequeridas: z.number().positive(),
-  frecuencia: z.string().trim().max(50).nullable().optional(),
-  adquisicion: z.enum(["almacenable", "compra_local"]).nullable().optional(),
+  frecuencia: z.string().trim().min(1).max(50),
+  adquisicion: z.enum(["almacenable", "compra_local"]),
   observaciones: z.string().trim().max(300).nullable().optional(),
   createdBy: z.string().trim().min(1).nullable().optional(),
 });
@@ -222,53 +193,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });
   }
 
-  const fechaRecepcion = body.fechaRecepcion ? parseDateParam(body.fechaRecepcion) : null;
-  if (body.fechaRecepcion && !fechaRecepcion) {
+  const fechaRecepcion = parseDateParam(body.fechaRecepcion);
+  if (!fechaRecepcion) {
     return NextResponse.json({ error: "Fecha de recepción inválida" }, { status: 400 });
   }
 
   const patient = await prisma.patient.upsert({
     where: { identificacion: body.patient.identificacion.toUpperCase() },
-    update: { nombre: body.patient.nombre ? body.patient.nombre.toUpperCase() : undefined },
+    update: { nombre: body.patient.nombre.toUpperCase() },
     create: {
       identificacion: body.patient.identificacion.toUpperCase(),
-      nombre: body.patient.nombre ? body.patient.nombre.toUpperCase() : null,
+      nombre: body.patient.nombre.toUpperCase(),
     },
   });
 
-  const parsedMedication = parseMedicationInput(body.medication);
-  let medicationId: string;
-  if (body.medication.id) {
-    medicationId = body.medication.id;
-  } else if (parsedMedication.codigoInstitucional) {
-    medicationId = (
-      await prisma.medication.upsert({
-        where: { codigoInstitucional: parsedMedication.codigoInstitucional },
-        update: { nombre: parsedMedication.nombre },
-        create: {
-          codigoInstitucional: parsedMedication.codigoInstitucional,
-          nombre: parsedMedication.nombre,
-        },
-      })
-    ).id;
-  } else {
-    const existing = await prisma.medication.findFirst({
-      where: { nombre: parsedMedication.nombre, codigoInstitucional: null },
-      select: { id: true },
-    });
-    medicationId =
-      existing?.id ??
-      (
-        await prisma.medication.create({
-          data: { codigoInstitucional: null, nombre: parsedMedication.nombre },
-          select: { id: true },
-        })
-      ).id;
-  }
+  const medicationId = body.medication.id;
 
   const normalizedDosis = body.dosisTexto.toUpperCase();
-  const normalizedFrecuencia = body.frecuencia ? body.frecuencia.toUpperCase() : null;
-  const normalizedAdquisicion = body.adquisicion ?? "almacenable";
+  const normalizedFrecuencia = body.frecuencia.toUpperCase();
+  const normalizedAdquisicion = body.adquisicion;
   const normalizedObservaciones = body.observaciones ?? null;
   const duplicateSince = new Date(Date.now() - DUPLICATE_WINDOW_MS);
 
@@ -279,18 +222,18 @@ export async function POST(request: Request) {
         where: { fechaAplicacion_patientId: { fechaAplicacion: fecha, patientId: patient.id } },
         update: {
           updatedBy: body.createdBy ?? undefined,
-          ...(fechaRecepcion !== null ? { fechaRecepcion } : {}),
-          ...(body.numeroReceta !== undefined ? { numeroReceta: body.numeroReceta } : {}),
-          ...(body.prescriberId !== undefined ? { prescriberId: body.prescriberId } : {}),
-          ...(body.pharmacistId !== undefined ? { pharmacistId: body.pharmacistId } : {}),
+          fechaRecepcion,
+          numeroReceta: body.numeroReceta,
+          prescriberId: body.prescriberId,
+          pharmacistId: body.pharmacistId,
         },
         create: {
           fechaAplicacion: fecha,
           fechaRecepcion,
-          numeroReceta: body.numeroReceta ?? null,
+          numeroReceta: body.numeroReceta,
           patientId: patient.id,
-          prescriberId: body.prescriberId ?? null,
-          pharmacistId: body.pharmacistId ?? null,
+          prescriberId: body.prescriberId,
+          pharmacistId: body.pharmacistId,
           createdBy: body.createdBy ?? null,
           updatedBy: body.createdBy ?? null,
         },

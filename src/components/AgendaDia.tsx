@@ -89,26 +89,25 @@ type PersonOption = {
 const MAX_APPLY_DATES = 16;
 
   const quickSchema = z.object({
-    fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Requerido" }),
     numeroReceta: z
       .string()
       .transform((v) => v.replace(/\D/g, "").slice(0, 6))
-      .refine((v) => !v || /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" })
-      .optional(),
-    prescriberId: z.string().uuid().optional(),
-    pharmacistId: z.string().uuid().optional(),
-    pharmacistTexto: z.string().optional(),
-    prescriberTexto: z.string().optional(),
+      .refine((v) => /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" }),
+    prescriberTexto: z.string().trim().min(1, "Requerido"),
+    prescriberId: z.string().uuid({ message: "Seleccione un prescriptor de la lista" }),
+    pharmacistTexto: z.string().trim().min(1, "Requerido"),
+    pharmacistId: z.string().uuid({ message: "Seleccione un farmacéutico de la lista" }),
     claveAutorizacion: z.string().trim().max(100).optional(),
-    identificacion: z.string().trim().min(1),
-    nombre: z.string().trim().min(1).optional(),
-    medicamentoId: z.string().uuid().optional(),
+    identificacion: z.string().trim().min(1, "Requerido"),
+    nombre: z.string().trim().min(1, "Requerido"),
+    medicamentoId: z.string().uuid({ message: "Seleccione un medicamento de la lista" }),
     medicamentoTexto: z.string().trim().min(1),
     dosisTexto: z.string().trim().min(1),
     unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
     totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive().max(MAX_APPLY_DATES)),
-    frecuencia: z.string().trim().max(50).optional(),
-    adquisicion: z.enum(["almacenable", "compra_local"]).default("almacenable"),
+    frecuencia: z.string().trim().min(1, "Requerido").max(50),
+    adquisicion: z.enum(["almacenable", "compra_local"]),
     observaciones: z.string().trim().max(300).optional(),
   });
 
@@ -412,16 +411,19 @@ export function AgendaDia() {
 
   const { register, handleSubmit, setValue, reset, formState, getValues } = useForm<QuickForm>({
     resolver: zodResolver(quickSchema),
+    mode: "onBlur",
+    reValidateMode: "onChange",
     defaultValues: {
       fechaRecepcion: fechaStr,
       numeroReceta: "",
-      prescriberId: undefined,
-      pharmacistId: undefined,
+      prescriberId: "",
+      pharmacistId: "",
       pharmacistTexto: "",
       prescriberTexto: "",
       claveAutorizacion: "",
       identificacion: "",
       nombre: "",
+      medicamentoId: "",
       medicamentoTexto: "",
       dosisTexto: "",
       unidadesRequeridas: 1,
@@ -543,16 +545,16 @@ export function AgendaDia() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           fechasAplicacion,
-          fechaRecepcion: values.fechaRecepcion || null,
-          numeroReceta: values.numeroReceta ? values.numeroReceta.replace(/\D/g, "").slice(0, 6) : null,
-          prescriberId: values.prescriberId || null,
-          pharmacistId: values.pharmacistId || null,
-          patient: { identificacion: values.identificacion, nombre: values.nombre || null },
+          fechaRecepcion: values.fechaRecepcion,
+          numeroReceta: values.numeroReceta.replace(/\D/g, "").slice(0, 6),
+          prescriberId: values.prescriberId,
+          pharmacistId: values.pharmacistId,
+          patient: { identificacion: values.identificacion, nombre: values.nombre },
           medication: { id: values.medicamentoId, nombre: values.medicamentoTexto },
           dosisTexto: values.dosisTexto,
           unidadesRequeridas: values.unidadesRequeridas,
-          frecuencia: values.frecuencia || null,
-          adquisicion: values.adquisicion || "almacenable",
+          frecuencia: values.frecuencia,
+          adquisicion: values.adquisicion,
           observaciones:
             values.claveAutorizacion?.trim() || values.observaciones?.trim()
               ? [
@@ -576,14 +578,14 @@ export function AgendaDia() {
       reset({
         fechaRecepcion: values.fechaRecepcion,
         numeroReceta: "",
-        prescriberId: undefined,
+        prescriberId: "",
         prescriberTexto: "",
         claveAutorizacion: "",
-        pharmacistId: undefined,
+        pharmacistId: "",
         pharmacistTexto: "",
         identificacion: "",
         nombre: "",
-        medicamentoId: undefined,
+        medicamentoId: "",
         medicamentoTexto: "",
         dosisTexto: "",
         unidadesRequeridas: 1,
@@ -955,11 +957,14 @@ export function AgendaDia() {
               onKeyDownCapture={onQuickKeyDownCapture}
             >
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Fecha de recepción</label>
+                <label className="block text-xs font-medium text-zinc-600">Fecha de recepción *</label>
                 <Input className="mt-1" type="date" {...register("fechaRecepcion")} />
+                {formState.errors.fechaRecepcion ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.fechaRecepcion.message}</div>
+                ) : null}
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Número de receta (6 dígitos)</label>
+                <label className="block text-xs font-medium text-zinc-600">Número de receta (6 dígitos) *</label>
                 <Input
                   className="mt-1"
                   inputMode="numeric"
@@ -989,7 +994,7 @@ export function AgendaDia() {
                 ) : null}
               </div>
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Identificación</label>
+                <label className="block text-xs font-medium text-zinc-600">Identificación *</label>
                 <Input
                   {...register("identificacion")}
                   ref={(el) => {
@@ -1000,15 +1005,18 @@ export function AgendaDia() {
                   className="mt-1"
                   placeholder="Ej: 1-1234-5678"
                   onChange={(e) => {
-                    setValue("identificacion", e.target.value);
+                    setValue("identificacion", e.target.value, { shouldValidate: true });
                     void loadPatientSuggestions(e.target.value);
                   }}
                   onBlur={() => {
                     const val = (document.querySelector('input[name="identificacion"]') as HTMLInputElement | null)?.value;
                     const match = patientSuggestions.find((p) => p.identificacion === val);
-                    if (match?.nombre) setValue("nombre", match.nombre ?? "");
+                    if (match?.nombre) setValue("nombre", match.nombre ?? "", { shouldValidate: true });
                   }}
                 />
+                {formState.errors.identificacion ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.identificacion.message}</div>
+                ) : null}
                 <datalist id="patient-suggestions">
                   {patientSuggestions.map((p) => (
                     <option key={p.id} value={p.identificacion}>
@@ -1018,34 +1026,44 @@ export function AgendaDia() {
                 </datalist>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Nombre del paciente</label>
+                <label className="block text-xs font-medium text-zinc-600">Nombre del paciente *</label>
                 <Input
                   {...register("nombre")}
                   className="mt-1"
                   placeholder="Autorrelleno si existe"
                 />
+                {formState.errors.nombre ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.nombre.message}</div>
+                ) : null}
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Medicamento</label>
+                <label className="block text-xs font-medium text-zinc-600">Medicamento *</label>
                 <Input
                   {...register("medicamentoTexto")}
                   list="med-suggestions"
                   className="mt-1"
                   placeholder="nombre / código"
                   onChange={(e) => {
-                    setValue("medicamentoTexto", e.target.value);
-                    setValue("medicamentoId", undefined);
+                    setValue("medicamentoTexto", e.target.value, { shouldValidate: true });
+                    setValue("medicamentoId", "", { shouldValidate: true });
                     void loadMedSuggestions(e.target.value);
                   }}
                   onBlur={() => {
                     const val = (document.querySelector('input[name="medicamentoTexto"]') as HTMLInputElement | null)?.value;
                     const match = medSuggestions.find((m) => m.label === val || m.nombre === val);
                     if (match) {
-                      setValue("medicamentoId", match.id);
-                      setValue("medicamentoTexto", match.nombre);
+                      setValue("medicamentoId", match.id, { shouldValidate: true });
+                      setValue("medicamentoTexto", match.nombre, { shouldValidate: true });
+                    } else {
+                      setValue("medicamentoId", "", { shouldValidate: true });
                     }
                   }}
                 />
+                {formState.errors.medicamentoId ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.medicamentoId.message}</div>
+                ) : formState.errors.medicamentoTexto ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.medicamentoTexto.message}</div>
+                ) : null}
                 <datalist id="med-suggestions">
                   {medSuggestions.map((m) => (
                     <option key={m.id} value={m.label} />
@@ -1053,20 +1071,26 @@ export function AgendaDia() {
                 </datalist>
               </div>
               <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Dosis</label>
+                <label className="block text-xs font-medium text-zinc-600">Dosis *</label>
                 <Input
                   {...register("dosisTexto")}
                   className="mt-1"
                   placeholder="Ej: 500 mg"
                 />
+                {formState.errors.dosisTexto ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.dosisTexto.message}</div>
+                ) : null}
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Frecuencia</label>
+                <label className="block text-xs font-medium text-zinc-600">Frecuencia *</label>
                 <Input
                   {...register("frecuencia")}
                   className="mt-1"
                   placeholder="Ej: CADA 8H / SEMANAL"
                 />
+                {formState.errors.frecuencia ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.frecuencia.message}</div>
+                ) : null}
               </div>
               <div className="md:col-span-1">
                 <label className="block text-xs font-medium text-zinc-600">Unidades *</label>
@@ -1121,7 +1145,7 @@ export function AgendaDia() {
                 />
               </div>
               <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">Prescriptor</label>
+                <label className="block text-xs font-medium text-zinc-600">Prescriptor *</label>
                 <Input
                   className="mt-1"
                   list="prescriber-suggestions"
@@ -1129,18 +1153,23 @@ export function AgendaDia() {
                   {...register("prescriberTexto")}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setValue("prescriberTexto", val);
+                    setValue("prescriberTexto", val, { shouldValidate: true });
                     const match = prescribers.find((p) => personLabel(p) === val);
-                    setValue("prescriberId", match?.id);
+                    setValue("prescriberId", match?.id ?? "", { shouldValidate: true });
                   }}
                   onBlur={() => {
                     const val =
                       (document.querySelector('input[name="prescriberTexto"]') as HTMLInputElement | null)?.value ??
                       "";
                     const match = prescribers.find((p) => personLabel(p) === val);
-                    setValue("prescriberId", match?.id);
+                    setValue("prescriberId", match?.id ?? "", { shouldValidate: true });
                   }}
                 />
+                {formState.errors.prescriberId ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.prescriberId.message}</div>
+                ) : formState.errors.prescriberTexto ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.prescriberTexto.message}</div>
+                ) : null}
                 <datalist id="prescriber-suggestions">
                   {prescribers.map((p) => (
                     <option key={p.id} value={personLabel(p)} />
@@ -1156,7 +1185,7 @@ export function AgendaDia() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Adquisición</label>
+                <label className="block text-xs font-medium text-zinc-600">Adquisición *</label>
                 <Select className="mt-1" {...register("adquisicion")}>
                   <option value="almacenable">ALMACENABLE</option>
                   <option value="compra_local">COMPRA LOCAL</option>
@@ -1268,7 +1297,7 @@ export function AgendaDia() {
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Farmacéutico</label>
+                <label className="block text-xs font-medium text-zinc-600">Farmacéutico *</label>
                 <Input
                   className="mt-1"
                   list="pharmacist-suggestions"
@@ -1276,18 +1305,23 @@ export function AgendaDia() {
                   {...register("pharmacistTexto")}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setValue("pharmacistTexto", val);
+                    setValue("pharmacistTexto", val, { shouldValidate: true });
                     const match = pharmacists.find((p) => personLabel(p) === val);
-                    setValue("pharmacistId", match?.id);
+                    setValue("pharmacistId", match?.id ?? "", { shouldValidate: true });
                   }}
                   onBlur={() => {
                     const val =
                       (document.querySelector('input[name="pharmacistTexto"]') as HTMLInputElement | null)?.value ??
                       "";
                     const match = pharmacists.find((p) => personLabel(p) === val);
-                    setValue("pharmacistId", match?.id);
+                    setValue("pharmacistId", match?.id ?? "", { shouldValidate: true });
                   }}
                 />
+                {formState.errors.pharmacistId ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.pharmacistId.message}</div>
+                ) : formState.errors.pharmacistTexto ? (
+                  <div className="mt-1 text-xs text-rose-700">{formState.errors.pharmacistTexto.message}</div>
+                ) : null}
                 <datalist id="pharmacist-suggestions">
                   {pharmacists.map((p) => (
                     <option key={p.id} value={personLabel(p)} />
@@ -1295,7 +1329,7 @@ export function AgendaDia() {
                 </datalist>
               </div>
               <div className="md:col-span-7 flex items-end justify-end">
-                <Button variant="primary" type="submit" disabled={formState.isSubmitting}>
+                <Button variant="primary" type="submit" disabled={formState.isSubmitting || !formState.isValid}>
                   Guardar
                 </Button>
               </div>
