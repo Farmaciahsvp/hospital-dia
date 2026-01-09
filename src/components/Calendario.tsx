@@ -35,6 +35,7 @@ type AgendaItem = {
   medicamento: string;
   dosisTexto: string;
   unidadesRequeridas: number;
+  recursoAmparo?: boolean;
 };
 
 function pad2(n: number) {
@@ -143,7 +144,7 @@ export function Calendario() {
     const rows: CalendarDayExportRow[] = items
       .map((it) => ({
         identificacion: it.identificacion,
-        nombre: it.nombre,
+        nombre: it.recursoAmparo ? `${it.nombre ?? ""} **` : it.nombre,
         numeroReceta: it.numeroReceta ?? null,
         medicationCodigo: it.medicationCodigo ?? null,
         medicationNombre: it.medicationNombre ?? it.medicamento,

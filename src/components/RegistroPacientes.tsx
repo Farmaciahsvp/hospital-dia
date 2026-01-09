@@ -41,6 +41,10 @@ export function RegistroPacientes() {
     patientId: string;
     cedula: string;
     nombre: string;
+    medicationId: string;
+    medicamento: string;
+    numeroReceta: string | null;
+    dosis: string;
   } | null>(null);
 
   async function load() {
@@ -240,6 +244,10 @@ export function RegistroPacientes() {
                             patientId: r.patientId,
                             cedula: r.cedula,
                             nombre: r.nombre ?? "",
+                            medicationId: r.medicationId,
+                            medicamento: r.medicamento,
+                            numeroReceta: r.numeroReceta,
+                            dosis: r.dosis,
                           })
                         }
                       >
@@ -304,7 +312,12 @@ export function RegistroPacientes() {
                   if (!toDelete) return;
                   setError(null);
                   try {
-                    await fetchJson(`/api/registro-pacientes/${toDelete.patientId}`, {
+                    const params = new URLSearchParams();
+                    params.set("medicationId", toDelete.medicationId);
+                    if (toDelete.numeroReceta) params.set("numeroReceta", toDelete.numeroReceta);
+                    params.set("dosis", toDelete.dosis);
+
+                    await fetchJson(`/api/registro-pacientes/${toDelete.patientId}?${params.toString()}`, {
                       method: "DELETE",
                     });
                     setToDelete(null);
@@ -314,18 +327,20 @@ export function RegistroPacientes() {
                   }
                 }}
               >
-                ELIMINAR (TODAS LAS FECHAS)
+                ELIMINAR REGISTRO
               </Button>
             </div>
           ) : null
         }
       >
         <div className="text-sm text-zinc-700">
-          ¿ELIMINAR A{" "}
+          ¿ELIMINAR EL MEDICAMENTO{" "}
+          <span className="font-semibold">{toDelete?.medicamento}</span>
+          {" "}DE{" "}
           <span className="font-semibold">
             {toDelete?.cedula} {toDelete?.nombre}
           </span>
-          ? SE BORRAN TODAS SUS FECHAS DE APLICACIÓN Y REGISTROS.
+          ? SE BORRARÁN LAS FECHAS ASOCIADAS A ESTE REGISTRO.
         </div>
       </Modal>
     </div>

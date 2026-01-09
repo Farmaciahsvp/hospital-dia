@@ -25,9 +25,9 @@ export async function GET(request: Request) {
 
     const statusList = status
       ? status
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
       : [];
 
     const items = await prisma.prepRequestItem.findMany({
@@ -39,26 +39,26 @@ export async function GET(request: Request) {
             finalizadoAt: null,
             patient: patientQuery
               ? {
-                  OR: [
-                    { identificacion: { contains: patientQuery, mode: "insensitive" } },
-                    { nombre: { contains: patientQuery, mode: "insensitive" } },
-                  ],
-                }
+                OR: [
+                  { identificacion: { contains: patientQuery, mode: "insensitive" } },
+                  { nombre: { contains: patientQuery, mode: "insensitive" } },
+                ],
+              }
               : undefined,
           },
         },
         medication: medicationQuery
           ? {
-              OR: [
-                { nombre: { contains: medicationQuery, mode: "insensitive" } },
-                {
-                  codigoInstitucional: {
-                    contains: medicationQuery,
-                    mode: "insensitive",
-                  },
+            OR: [
+              { nombre: { contains: medicationQuery, mode: "insensitive" } },
+              {
+                codigoInstitucional: {
+                  contains: medicationQuery,
+                  mode: "insensitive",
                 },
-              ],
-            }
+              },
+            ],
+          }
           : undefined,
       },
       include: {
@@ -83,6 +83,7 @@ export async function GET(request: Request) {
         patientId: i.prepRequest.patientId,
         fechaAplicacion: i.prepRequest.fechaAplicacion.toISOString().slice(0, 10),
         numeroReceta: i.prepRequest.numeroReceta ?? null,
+        recursoAmparo: i.prepRequest.recursoAmparo,
         estado: i.estado,
         identificacion: i.prepRequest.patient.identificacion,
         nombre: i.prepRequest.patient.nombre,
@@ -166,6 +167,7 @@ const createItemSchema = z.object({
   frecuencia: z.string().trim().min(1).max(50),
   adquisicion: z.enum(["almacenable", "compra_local"]),
   observaciones: z.string().trim().max(300).nullable().optional(),
+  recursoAmparo: z.boolean().optional(),
   createdBy: z.string().trim().min(1).nullable().optional(),
 });
 
@@ -226,6 +228,7 @@ export async function POST(request: Request) {
           numeroReceta: body.numeroReceta,
           prescriberId: body.prescriberId,
           pharmacistId: body.pharmacistId,
+          recursoAmparo: body.recursoAmparo ?? false,
         },
         create: {
           fechaAplicacion: fecha,
@@ -234,6 +237,7 @@ export async function POST(request: Request) {
           patientId: patient.id,
           prescriberId: body.prescriberId,
           pharmacistId: body.pharmacistId,
+          recursoAmparo: body.recursoAmparo ?? false,
           createdBy: body.createdBy ?? null,
           updatedBy: body.createdBy ?? null,
         },

@@ -88,28 +88,29 @@ type PersonOption = {
 
 const MAX_APPLY_DATES = 16;
 
-  const quickSchema = z.object({
-    fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Requerido" }),
-    numeroReceta: z
-      .string()
-      .transform((v) => v.replace(/\D/g, "").slice(0, 6))
-      .refine((v) => /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" }),
-    prescriberTexto: z.string().trim().min(1, "Requerido"),
-    prescriberId: z.string().uuid({ message: "Seleccione un prescriptor de la lista" }),
-    pharmacistTexto: z.string().trim().min(1, "Requerido"),
-    pharmacistId: z.string().uuid({ message: "Seleccione un farmacéutico de la lista" }),
-    claveAutorizacion: z.string().trim().max(100).optional(),
-    identificacion: z.string().trim().min(1, "Requerido"),
-    nombre: z.string().trim().min(1, "Requerido"),
-    medicamentoId: z.string().uuid({ message: "Seleccione un medicamento de la lista" }),
-    medicamentoTexto: z.string().trim().min(1),
-    dosisTexto: z.string().trim().min(1),
-    unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
-    totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive().max(MAX_APPLY_DATES)),
-    frecuencia: z.string().trim().min(1, "Requerido").max(50),
-    adquisicion: z.enum(["almacenable", "compra_local"]),
-    observaciones: z.string().trim().max(300).optional(),
-  });
+const quickSchema = z.object({
+  fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Requerido" }),
+  numeroReceta: z
+    .string()
+    .transform((v) => v.replace(/\D/g, "").slice(0, 6))
+    .refine((v) => /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" }),
+  prescriberTexto: z.string().trim().min(1, "Requerido"),
+  prescriberId: z.string().uuid({ message: "Seleccione un prescriptor de la lista" }),
+  pharmacistTexto: z.string().trim().min(1, "Requerido"),
+  pharmacistId: z.string().uuid({ message: "Seleccione un farmacéutico de la lista" }),
+  claveAutorizacion: z.string().trim().max(100).optional(),
+  identificacion: z.string().trim().min(1, "Requerido"),
+  nombre: z.string().trim().min(1, "Requerido"),
+  medicamentoId: z.string().uuid({ message: "Seleccione un medicamento de la lista" }),
+  medicamentoTexto: z.string().trim().min(1),
+  dosisTexto: z.string().trim().min(1),
+  unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
+  totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive().max(MAX_APPLY_DATES)),
+  frecuencia: z.string().trim().min(1, "Requerido").max(50),
+  adquisicion: z.enum(["almacenable", "compra_local"]),
+  observaciones: z.string().trim().max(300).optional(),
+  recursoAmparo: z.boolean().optional(),
+});
 
 type QuickForm = z.infer<typeof quickSchema>;
 
@@ -431,6 +432,7 @@ export function AgendaDia() {
       frecuencia: "",
       adquisicion: "almacenable",
       observaciones: "",
+      recursoAmparo: false,
     },
   });
 
@@ -558,12 +560,13 @@ export function AgendaDia() {
           observaciones:
             values.claveAutorizacion?.trim() || values.observaciones?.trim()
               ? [
-                  values.claveAutorizacion?.trim() ? `Clave autorización: ${values.claveAutorizacion.trim()}` : null,
-                  values.observaciones?.trim() ? values.observaciones.trim() : null,
-                ]
-                  .filter(Boolean)
-                  .join(" | ")
+                values.claveAutorizacion?.trim() ? `Clave autorización: ${values.claveAutorizacion.trim()}` : null,
+                values.observaciones?.trim() ? values.observaciones.trim() : null,
+              ]
+                .filter(Boolean)
+                .join(" | ")
               : null,
+          recursoAmparo: values.recursoAmparo,
           createdBy: "farmacia",
         }),
       });
@@ -593,6 +596,7 @@ export function AgendaDia() {
         frecuencia: "",
         adquisicion: "almacenable",
         observaciones: "",
+        recursoAmparo: false,
       });
       setApplyDates([fechaStr]);
       setApplyDateTexts([formatDMY(fechaStr)]);
@@ -1187,11 +1191,24 @@ export function AgendaDia() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-zinc-600">Clave de Autorización</label>
-                <Input
-                  {...register("claveAutorizacion")}
-                  className="mt-1"
-                  placeholder="Opcional"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    {...register("claveAutorizacion")}
+                    className="mt-1 flex-1"
+                    placeholder="Opcional"
+                  />
+                  <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 mt-1">
+                    <input
+                      type="checkbox"
+                      id="ra-check"
+                      {...register("recursoAmparo")}
+                      className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="ra-check" className="cursor-pointer text-xs font-bold text-blue-800">
+                      RA
+                    </label>
+                  </div>
+                </div>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-zinc-600">Adquisición *</label>
@@ -1602,13 +1619,12 @@ export function AgendaDia() {
                 {items.map((i, idx) => (
                   <tr
                     key={i.id}
-                    className={`border-b border-zinc-100 ${
-                      editId === i.id
-                        ? "bg-emerald-50"
-                        : idx % 2 === 0
-                          ? "bg-white"
-                          : "bg-zinc-50"
-                    } hover:bg-zinc-100/60`}
+                    className={`border-b border-zinc-100 ${editId === i.id
+                      ? "bg-emerald-50"
+                      : idx % 2 === 0
+                        ? "bg-white"
+                        : "bg-zinc-50"
+                      } hover:bg-zinc-100/60`}
                     onDoubleClick={() => startEdit(i)}
                   >
                     <td className="px-3 py-2 text-center">
@@ -1666,11 +1682,10 @@ export function AgendaDia() {
                       ) : (
                         <button
                           type="button"
-                          className={`inline-flex items-center rounded-md border px-2 py-1 text-xs ${
-                            i.observaciones
-                              ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-                              : "border-transparent bg-transparent text-zinc-400"
-                          }`}
+                          className={`inline-flex items-center rounded-md border px-2 py-1 text-xs ${i.observaciones
+                            ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                            : "border-transparent bg-transparent text-zinc-400"
+                            }`}
                           onClick={() => setObsItem(i)}
                           disabled={!i.observaciones}
                         >
