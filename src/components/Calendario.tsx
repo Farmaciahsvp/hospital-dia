@@ -371,6 +371,87 @@ export function Calendario() {
               })}
             </div>
           </div>
+
+          <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="text-center">
+              <div className="text-xs font-medium text-zinc-500">PLANIFICACION DE STOCK</div>
+              <div className="text-sm font-semibold text-zinc-900">MEDICAMENTOS REQUERIDOS POR RANGO</div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">DESDE</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">HASTA</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="w-full py-2"
+                  onClick={() => void loadRangeStock()}
+                  disabled={rangeLoading}
+                >
+                  {rangeLoading ? "CARGANDO..." : "ACTUALIZAR"}
+                </Button>
+              </div>
+            </div>
+
+            {rangeError ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {rangeError.toUpperCase()}
+              </div>
+            ) : null}
+
+            <div className="mt-3 flex items-center justify-between text-sm text-zinc-600">
+              <span>{stockRows.length} MEDICAMENTOS</span>
+              <span>LINEAS: {stockTotals.lineas} | UNIDADES: {stockTotals.unidades}</span>
+            </div>
+
+            <div className="mt-3 max-h-[45vh] overflow-auto rounded-2xl border border-zinc-200">
+              <table className="min-w-full text-center text-sm text-blue-950">
+                <thead className="bg-white">
+                  <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
+                    <th className="px-3 py-2 text-center">MEDICAMENTO</th>
+                    <th className="px-3 py-2 text-center">LINEAS</th>
+                    <th className="px-3 py-2 text-center">UNIDADES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockRows.map((r, idx) => (
+                    <tr
+                      key={r.medicationId}
+                      className={`${idx % 2 === 0 ? "bg-white" : "bg-zinc-50"} border-b border-zinc-100`}
+                    >
+                      <td className="px-3 py-2 text-center">{r.medicamento}</td>
+                      <td className="px-3 py-2 text-center">{r.lineas}</td>
+                      <td className="px-3 py-2 text-center font-semibold">{r.unidades}</td>
+                    </tr>
+                  ))}
+                  {!stockRows.length && !rangeLoading ? (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-8 text-center text-sm text-zinc-500">
+                        SIN REQUERIMIENTOS PARA ESTE RANGO
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <div className="lg:col-span-5">
@@ -454,86 +535,6 @@ export function Calendario() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="text-center">
-              <div className="text-xs font-medium text-zinc-500">PLANIFICACION DE STOCK</div>
-              <div className="text-sm font-semibold text-zinc-900">MEDICAMENTOS REQUERIDOS POR RANGO</div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-              <div>
-                <label className="block text-xs font-medium text-zinc-600">DESDE</label>
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
-                  value={rangeFrom}
-                  onChange={(e) => setRangeFrom(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-600">HASTA</label>
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
-                  value={rangeTo}
-                  onChange={(e) => setRangeTo(e.target.value)}
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  className="w-full py-2"
-                  onClick={() => void loadRangeStock()}
-                  disabled={rangeLoading}
-                >
-                  {rangeLoading ? "CARGANDO..." : "ACTUALIZAR"}
-                </Button>
-              </div>
-            </div>
-
-            {rangeError ? (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {rangeError.toUpperCase()}
-              </div>
-            ) : null}
-
-            <div className="mt-3 flex items-center justify-between text-sm text-zinc-600">
-              <span>{stockRows.length} MEDICAMENTOS</span>
-              <span>LINEAS: {stockTotals.lineas} | UNIDADES: {stockTotals.unidades}</span>
-            </div>
-
-            <div className="mt-3 max-h-[40vh] overflow-auto rounded-2xl border border-zinc-200">
-              <table className="min-w-full text-center text-sm text-blue-950">
-                <thead className="bg-white">
-                  <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                    <th className="px-3 py-2 text-center">MEDICAMENTO</th>
-                    <th className="px-3 py-2 text-center">LINEAS</th>
-                    <th className="px-3 py-2 text-center">UNIDADES</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stockRows.map((r, idx) => (
-                    <tr
-                      key={r.medicationId}
-                      className={`${idx % 2 === 0 ? "bg-white" : "bg-zinc-50"} border-b border-zinc-100`}
-                    >
-                      <td className="px-3 py-2 text-center">{r.medicamento}</td>
-                      <td className="px-3 py-2 text-center">{r.lineas}</td>
-                      <td className="px-3 py-2 text-center font-semibold">{r.unidades}</td>
-                    </tr>
-                  ))}
-                  {!stockRows.length && !rangeLoading ? (
-                    <tr>
-                      <td colSpan={3} className="px-3 py-8 text-center text-sm text-zinc-500">
-                        SIN REQUERIMIENTOS PARA ESTE RANGO
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
     </div>

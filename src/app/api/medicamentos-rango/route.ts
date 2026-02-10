@@ -96,7 +96,18 @@ export async function GET(request: Request) {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Error";
+    const lower = message.toLowerCase();
+    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
+      return NextResponse.json(
+        {
+          requestId,
+          error:
+            "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
+          details: message,
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ requestId, error: message }, { status: 500 });
   }
 }
-
