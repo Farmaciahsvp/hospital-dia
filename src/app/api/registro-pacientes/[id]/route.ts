@@ -11,6 +11,14 @@ export async function DELETE(
   const numeroReceta = url.searchParams.get("numeroReceta"); // Can be null/empty string
   const dosisTexto = url.searchParams.get("dosis");
 
+  // Require explicit numeroReceta filter to avoid broad deletions by accident.
+  if (numeroReceta === null) {
+    return NextResponse.json(
+      { error: "Debe enviar numeroReceta (usar cadena vacía para receta nula)." },
+      { status: 400 },
+    );
+  }
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Delete matching Items
@@ -71,4 +79,3 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

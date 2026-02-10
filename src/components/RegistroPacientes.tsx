@@ -314,7 +314,7 @@ export function RegistroPacientes() {
                   try {
                     const params = new URLSearchParams();
                     params.set("medicationId", toDelete.medicationId);
-                    if (toDelete.numeroReceta) params.set("numeroReceta", toDelete.numeroReceta);
+                    params.set("numeroReceta", toDelete.numeroReceta ?? "");
                     params.set("dosis", toDelete.dosis);
 
                     await fetchJson(`/api/registro-pacientes/${toDelete.patientId}?${params.toString()}`, {

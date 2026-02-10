@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 const MED_CODE_RE = /^\d-\d{2}-\d{2}-\d{4}$/;
 
 function parseDate(raw: string) {
-  const d = new Date(`${raw}T00:00:00`);
+  const d = new Date(`${raw}T00:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }

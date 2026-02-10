@@ -2240,7 +2240,7 @@ export function AgendaDia() {
       </Modal>
 
       <Modal
-        open={false}
+        open={!!editPatient}
         title="Editar paciente"
         onClose={() => setEditPatient(null)}
         footer={
@@ -2331,7 +2331,6 @@ export function AgendaDia() {
     </div>
   );
 }
-
 
 
 

@@ -151,14 +151,7 @@ export function exportCalendarDayPdf(
     },
   });
 
-  const lastY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 40;
-  const signatureY = doc.internal.pageSize.getHeight() + 1000 + lastY;
-  doc.setFontSize(10);
-  doc.text(
-    "DIGITADOR: ____________________    ACOPIADO POR: ____________________    FARMACÉUTICO: ____________________",
-    14,
-    signatureY,
-  );
-
   doc.save(filename);
 }
+
+
