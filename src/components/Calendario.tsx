@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, RefreshCw } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
@@ -16,6 +16,13 @@ type DayPatient = {
     unidades: number;
     estado: string;
   }[];
+};
+
+type StockRow = {
+  medicationId: string;
+  medicamento: string;
+  lineas: number;
+  unidades: number;
 };
 
 type AgendaItem = {
@@ -50,6 +57,12 @@ function formatDMY(iso: string) {
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return iso;
   return `${d}/${m}/${y}`;
+}
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
 function startOfMonth(date: Date) {
@@ -112,6 +125,15 @@ export function Calendario() {
   const [patients, setPatients] = useState<DayPatient[]>([]);
   const [items, setItems] = useState<AgendaItem[]>([]);
   const loadRequestIdRef = useRef(0);
+  const [rangeFrom, setRangeFrom] = useState(() => toISODate(new Date()));
+  const [rangeTo, setRangeTo] = useState(() => toISODate(addDays(new Date(), 6)));
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  const [stockRows, setStockRows] = useState<StockRow[]>([]);
+  const [stockTotals, setStockTotals] = useState<{ lineas: number; unidades: number }>({
+    lineas: 0,
+    unidades: 0,
+  });
 
   const monthLabel = useMemo(() => {
     return month.toLocaleDateString("es-ES", { month: "long", year: "numeric" }).toUpperCase();
@@ -180,6 +202,44 @@ export function Calendario() {
   useEffect(() => {
     void loadDay(selected);
   }, [selected]);
+
+  useEffect(() => {
+    setRangeFrom(selected);
+    const selectedDate = parseIsoDate(selected) ?? new Date();
+    setRangeTo(toISODate(addDays(selectedDate, 6)));
+  }, [selected]);
+
+  const loadRangeStock = useCallback(async () => {
+    if (!rangeFrom || !rangeTo) {
+      setRangeError("Debe indicar fecha inicial y final");
+      setStockRows([]);
+      setStockTotals({ lineas: 0, unidades: 0 });
+      return;
+    }
+    setRangeLoading(true);
+    setRangeError(null);
+    try {
+      const url = new URL("/api/medicamentos-rango", window.location.origin);
+      url.searchParams.set("from", rangeFrom);
+      url.searchParams.set("to", rangeTo);
+      const data = await fetchJson<{
+        rows?: StockRow[];
+        totals?: { lineas: number; unidades: number };
+      }>(url.toString(), { cache: "no-store" });
+      setStockRows(data.rows ?? []);
+      setStockTotals(data.totals ?? { lineas: 0, unidades: 0 });
+    } catch (e) {
+      setStockRows([]);
+      setStockTotals({ lineas: 0, unidades: 0 });
+      setRangeError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setRangeLoading(false);
+    }
+  }, [rangeFrom, rangeTo]);
+
+  useEffect(() => {
+    void loadRangeStock();
+  }, [loadRangeStock]);
 
   function handleExportPdf() {
     if (!items.length) return;
@@ -391,6 +451,87 @@ export function Calendario() {
                   SIN PACIENTES PROGRAMADOS PARA ESTE DÍA.
                 </div>
               ) : null}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="text-center">
+              <div className="text-xs font-medium text-zinc-500">PLANIFICACION DE STOCK</div>
+              <div className="text-sm font-semibold text-zinc-900">MEDICAMENTOS REQUERIDOS POR RANGO</div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">DESDE</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">HASTA</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="w-full py-2"
+                  onClick={() => void loadRangeStock()}
+                  disabled={rangeLoading}
+                >
+                  {rangeLoading ? "CARGANDO..." : "ACTUALIZAR"}
+                </Button>
+              </div>
+            </div>
+
+            {rangeError ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {rangeError.toUpperCase()}
+              </div>
+            ) : null}
+
+            <div className="mt-3 flex items-center justify-between text-sm text-zinc-600">
+              <span>{stockRows.length} MEDICAMENTOS</span>
+              <span>LINEAS: {stockTotals.lineas} | UNIDADES: {stockTotals.unidades}</span>
+            </div>
+
+            <div className="mt-3 max-h-[40vh] overflow-auto rounded-2xl border border-zinc-200">
+              <table className="min-w-full text-center text-sm text-blue-950">
+                <thead className="bg-white">
+                  <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
+                    <th className="px-3 py-2 text-center">MEDICAMENTO</th>
+                    <th className="px-3 py-2 text-center">LINEAS</th>
+                    <th className="px-3 py-2 text-center">UNIDADES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockRows.map((r, idx) => (
+                    <tr
+                      key={r.medicationId}
+                      className={`${idx % 2 === 0 ? "bg-white" : "bg-zinc-50"} border-b border-zinc-100`}
+                    >
+                      <td className="px-3 py-2 text-center">{r.medicamento}</td>
+                      <td className="px-3 py-2 text-center">{r.lineas}</td>
+                      <td className="px-3 py-2 text-center font-semibold">{r.unidades}</td>
+                    </tr>
+                  ))}
+                  {!stockRows.length && !rangeLoading ? (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-8 text-center text-sm text-zinc-500">
+                        SIN REQUERIMIENTOS PARA ESTE RANGO
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
