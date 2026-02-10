@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, RefreshCw } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
@@ -56,12 +56,50 @@ function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function addMonths(date: Date, delta: number) {
-  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
-}
-
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function parseIsoDate(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case "pendiente":
+      return "PENDIENTE";
+    case "en_preparacion":
+      return "EN PREPARACION";
+    case "listo":
+      return "LISTO";
+    case "entregado":
+      return "ENTREGADO";
+    case "cancelado":
+      return "CANCELADO";
+    default:
+      return status.toUpperCase();
+  }
+}
+
+function statusClass(status: string) {
+  switch (status) {
+    case "pendiente":
+      return "bg-sky-50 text-sky-700";
+    case "en_preparacion":
+      return "bg-blue-50 text-blue-700";
+    case "listo":
+      return "bg-indigo-50 text-indigo-700";
+    case "entregado":
+      return "bg-slate-100 text-slate-700";
+    case "cancelado":
+      return "bg-rose-50 text-rose-700";
+    default:
+      return "bg-zinc-100 text-zinc-700";
+  }
 }
 
 export function Calendario() {
@@ -73,6 +111,7 @@ export function Calendario() {
   const [error, setError] = useState<string | null>(null);
   const [patients, setPatients] = useState<DayPatient[]>([]);
   const [items, setItems] = useState<AgendaItem[]>([]);
+  const loadRequestIdRef = useRef(0);
 
   const monthLabel = useMemo(() => {
     return month.toLocaleDateString("es-ES", { month: "long", year: "numeric" }).toUpperCase();
@@ -95,12 +134,14 @@ export function Calendario() {
   }, [month]);
 
   async function loadDay(iso: string) {
+    const requestId = ++loadRequestIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchJson<{ items?: AgendaItem[] }>(`/api/items?date=${encodeURIComponent(iso)}`, {
+      const data = await fetchJson<{ items?: AgendaItem[] }>(`/api/items?date=${encodeURIComponent(iso)}&take=5000`, {
         cache: "no-store",
       });
+      if (requestId !== loadRequestIdRef.current) return;
       const items = data.items ?? [];
       setItems(items);
 
@@ -127,11 +168,12 @@ export function Calendario() {
       const list = Array.from(map.values()).sort((a, b) => a.identificacion.localeCompare(b.identificacion));
       setPatients(list);
     } catch (e) {
+      if (requestId !== loadRequestIdRef.current) return;
       setPatients([]);
       setItems([]);
       setError(e instanceof Error ? e.message : "Error");
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestIdRef.current) setLoading(false);
     }
   }
 
@@ -188,7 +230,16 @@ export function Calendario() {
                   variant="secondary"
                   type="button"
                   className="px-2 py-2"
-                  onClick={() => setMonth((m) => addMonths(m, -1))}
+                  onClick={() => {
+                    const selectedDate = parseIsoDate(selected) ?? new Date();
+                    const nextSelected = new Date(
+                      selectedDate.getFullYear(),
+                      selectedDate.getMonth() - 1,
+                      selectedDate.getDate(),
+                    );
+                    setMonth(startOfMonth(nextSelected));
+                    setSelected(toISODate(nextSelected));
+                  }}
                   aria-label="Mes anterior"
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -197,12 +248,29 @@ export function Calendario() {
                   variant="secondary"
                   type="button"
                   className="px-2 py-2"
-                  onClick={() => setMonth((m) => addMonths(m, 1))}
+                  onClick={() => {
+                    const selectedDate = parseIsoDate(selected) ?? new Date();
+                    const nextSelected = new Date(
+                      selectedDate.getFullYear(),
+                      selectedDate.getMonth() + 1,
+                      selectedDate.getDate(),
+                    );
+                    setMonth(startOfMonth(nextSelected));
+                    setSelected(toISODate(nextSelected));
+                  }}
                   aria-label="Mes siguiente"
                 >
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
-                <Button variant="secondary" type="button" onClick={() => setMonth(startOfMonth(new Date()))}>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    setMonth(startOfMonth(now));
+                    setSelected(toISODate(now));
+                  }}
+                >
                   HOY
                 </Button>
               </div>
@@ -224,7 +292,10 @@ export function Calendario() {
                   <button
                     key={d.iso}
                     type="button"
-                    onClick={() => setSelected(d.iso)}
+                    onClick={() => {
+                      setSelected(d.iso);
+                      setMonth(startOfMonth(d.date));
+                    }}
                     className={[
                       "h-12 rounded-xl border text-sm shadow-sm transition",
                       d.inMonth ? "bg-white" : "bg-zinc-50",
@@ -301,9 +372,14 @@ export function Calendario() {
                   <div className="mt-2 divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200">
                     {p.lines.map((l, idx) => (
                       <div key={idx} className="grid grid-cols-12 gap-2 bg-white px-2 py-2 text-xs text-blue-950">
-                        <div className="col-span-7 text-center">{l.medicamento}</div>
+                        <div className="col-span-6 text-center">{l.medicamento}</div>
                         <div className="col-span-3 text-center">{l.dosis}</div>
-                        <div className="col-span-2 text-center">{l.unidades}</div>
+                        <div className="col-span-1 text-center">{l.unidades}</div>
+                        <div className="col-span-2 text-center">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${statusClass(l.estado)}`}>
+                            {statusLabel(l.estado)}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>

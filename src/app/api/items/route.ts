@@ -22,6 +22,10 @@ export async function GET(request: Request) {
     const patientQuery = (url.searchParams.get("patient") ?? "").trim();
     const medicationQuery = (url.searchParams.get("med") ?? "").trim();
     const status = (url.searchParams.get("status") ?? "").trim();
+    const takeParam = Number(url.searchParams.get("take") ?? "500");
+    const take = Number.isFinite(takeParam)
+      ? Math.min(Math.max(Math.trunc(takeParam), 1), 5000)
+      : 500;
 
     const statusList = status
       ? status
@@ -72,7 +76,7 @@ export async function GET(request: Request) {
         },
       },
       orderBy: [{ updatedAt: "desc" }],
-      take: 500,
+      take,
     });
 
     return NextResponse.json({
