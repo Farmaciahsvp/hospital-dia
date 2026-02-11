@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Search, Trash2 } from "lucide-react";
+import { Pencil, Search, Trash2 } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
+import { MAX_APPLY_DATES } from "@/lib/domain-rules";
 
 type Row = {
   patientId: string;
@@ -18,6 +19,7 @@ type Row = {
   dosis: string;
   fechasAplicacion: string[];
   fechasAplicacionCumplidas: string[];
+  itemIds: string[];
   farmaceutico: string | null;
 };
 
@@ -45,6 +47,14 @@ export function RegistroPacientes() {
     medicamento: string;
     numeroReceta: string | null;
     dosis: string;
+  } | null>(null);
+  const [toEditPatient, setToEditPatient] = useState<{
+    patientId: string;
+    cedula: string;
+    nombre: string;
+    itemIds: string[];
+    fechasAplicacion: string[];
+    fechaNueva: string;
   } | null>(null);
 
   async function load() {
@@ -235,6 +245,24 @@ export function RegistroPacientes() {
                   <td className="whitespace-nowrap px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <Button
+                        variant="secondary"
+                        type="button"
+                        className="px-2 py-2"
+                        aria-label="Editar paciente"
+                        onClick={() =>
+                          setToEditPatient({
+                            patientId: r.patientId,
+                            cedula: r.cedula,
+                            nombre: r.nombre ?? "",
+                            itemIds: r.itemIds,
+                            fechasAplicacion: [...r.fechasAplicacion],
+                            fechaNueva: "",
+                          })
+                        }
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
                         variant="danger"
                         type="button"
                         className="px-2 py-2"
@@ -341,6 +369,155 @@ export function RegistroPacientes() {
             {toDelete?.cedula} {toDelete?.nombre}
           </span>
           ? SE BORRARÁN LAS FECHAS ASOCIADAS A ESTE REGISTRO.
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!toEditPatient}
+        title="EDITAR PACIENTE"
+        onClose={() => setToEditPatient(null)}
+        footer={
+          toEditPatient ? (
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={() => setToEditPatient(null)}>
+                VOLVER
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                onClick={async () => {
+                  if (!toEditPatient) return;
+                  const cedula = toEditPatient.cedula.trim();
+                  const nombre = toEditPatient.nombre.trim();
+                  const fechasAplicacion = Array.from(new Set(toEditPatient.fechasAplicacion.filter(Boolean))).sort();
+                  if (!cedula) {
+                    setError("La cédula es obligatoria");
+                    return;
+                  }
+                  if (!nombre) {
+                    setError("El nombre es obligatorio");
+                    return;
+                  }
+                  if (!fechasAplicacion.length) {
+                    setError("Debe indicar al menos una fecha de aplicación");
+                    return;
+                  }
+                  if (fechasAplicacion.length > MAX_APPLY_DATES) {
+                    setError(`Máximo ${MAX_APPLY_DATES} fechas de aplicación`);
+                    return;
+                  }
+                  try {
+                    await fetchJson(`/api/patients/${toEditPatient.patientId}`, {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        identificacion: cedula,
+                        nombre,
+                      }),
+                    });
+                    await fetchJson(`/api/registro-pacientes/${toEditPatient.patientId}`, {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        itemIds: toEditPatient.itemIds,
+                        fechasAplicacion,
+                      }),
+                    });
+                    setToEditPatient(null);
+                    await load();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Error");
+                  }
+                }}
+              >
+                GUARDAR
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">CÉDULA</label>
+            <Input
+              className="mt-1"
+              value={toEditPatient?.cedula ?? ""}
+              onChange={(e) =>
+                setToEditPatient((prev) => (prev ? { ...prev, cedula: e.target.value } : prev))
+              }
+              placeholder="Ej: 01044010583"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">NOMBRE</label>
+            <Input
+              className="mt-1"
+              value={toEditPatient?.nombre ?? ""}
+              onChange={(e) =>
+                setToEditPatient((prev) => (prev ? { ...prev, nombre: e.target.value } : prev))
+              }
+              placeholder="Nombre completo"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">FECHAS DE APLICACIÓN (MÁX. {MAX_APPLY_DATES})</label>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {(toEditPatient?.fechasAplicacion ?? []).map((iso) => (
+                <span
+                  key={iso}
+                  className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-900"
+                >
+                  {formatDMY(iso)}
+                  <button
+                    type="button"
+                    className="text-blue-700 hover:text-blue-900"
+                    onClick={() =>
+                      setToEditPatient((prev) =>
+                        prev
+                          ? { ...prev, fechasAplicacion: prev.fechasAplicacion.filter((d) => d !== iso) }
+                          : prev,
+                      )
+                    }
+                    aria-label={`Quitar fecha ${iso}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <Input
+                type="date"
+                className="max-w-xs"
+                value={toEditPatient?.fechaNueva ?? ""}
+                onChange={(e) =>
+                  setToEditPatient((prev) => (prev ? { ...prev, fechaNueva: e.target.value } : prev))
+                }
+              />
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  if (!toEditPatient?.fechaNueva) return;
+                  setToEditPatient((prev) => {
+                    if (!prev) return prev;
+                    if (prev.fechasAplicacion.includes(prev.fechaNueva)) {
+                      return { ...prev, fechaNueva: "" };
+                    }
+                    if (prev.fechasAplicacion.length >= MAX_APPLY_DATES) return prev;
+                    return {
+                      ...prev,
+                      fechasAplicacion: [...prev.fechasAplicacion, prev.fechaNueva].sort(),
+                      fechaNueva: "",
+                    };
+                  });
+                }}
+                disabled={!toEditPatient?.fechaNueva}
+              >
+                AGREGAR
+              </Button>
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

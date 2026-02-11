@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ItemStatus } from "@prisma/client";
+import { DUPLICATE_WINDOW_MS, MAX_APPLY_DATES } from "@/lib/domain-rules";
 import { getRequestId } from "@/lib/api-server";
-
-const MAX_APPLY_DATES = 16;
-const DUPLICATE_WINDOW_MS = 2000;
 
 function parseDateParam(raw: string | null) {
   if (!raw) return null;

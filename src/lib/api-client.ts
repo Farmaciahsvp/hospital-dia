@@ -3,6 +3,7 @@ export type ApiErrorPayload = {
   details?: string;
   requestId?: string;
 };
+import { addErrorLog } from "@/lib/error-log";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -19,6 +20,11 @@ function parseRetryAfterMs(value: string | null): number | null {
 
 function shouldRetry(status: number) {
   return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function logClientError(message: string, details?: string) {
+  if (typeof window === "undefined") return;
+  addErrorLog({ source: "api-client.fetchJson", message, details });
 }
 
 export async function fetchJson<T>(
@@ -57,6 +63,7 @@ export async function fetchJson<T>(
           continue;
         }
 
+        logClientError(message, requestId ? `requestId=${requestId}` : undefined);
         throw new Error(requestId ? `${message} (ID: ${requestId})` : message);
       }
 
@@ -73,6 +80,7 @@ export async function fetchJson<T>(
         continue;
       }
 
+      logClientError(e instanceof Error ? e.message : "Error inesperado de red");
       throw e;
     } finally {
       clearTimeout(timeout);
@@ -81,4 +89,3 @@ export async function fetchJson<T>(
 
   throw lastError instanceof Error ? lastError : new Error("Error inesperado");
 }
-

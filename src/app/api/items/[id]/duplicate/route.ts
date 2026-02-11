@@ -11,7 +11,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const body = schema.parse(await request.json());
+  const body = schema.parse(await request.json().catch(() => ({})));
 
   const item = await prisma.prepRequestItem.findUnique({ where: { id } });
   if (!item) return NextResponse.json({ error: "No existe" }, { status: 404 });
@@ -23,6 +23,8 @@ export async function POST(
       dosisTexto: item.dosisTexto,
       unidadesRequeridas: item.unidadesRequeridas,
       estado: "pendiente",
+      frecuencia: item.frecuencia,
+      adquisicion: item.adquisicion,
       observaciones: item.observaciones,
       createdBy: body.createdBy ?? null,
       updatedBy: body.createdBy ?? null,
@@ -31,4 +33,3 @@ export async function POST(
 
   return NextResponse.json({ id: duplicated.id });
 }
-

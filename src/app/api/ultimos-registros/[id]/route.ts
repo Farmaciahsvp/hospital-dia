@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { MAX_APPLY_DATES } from "@/lib/domain-rules";
 
 const MED_CODE_RE = /^\d-\d{2}-\d{2}-\d{4}$/;
 
@@ -57,7 +58,7 @@ const schema = z.object({
   prescriberId: z.string().uuid().nullable().optional(),
   pharmacistId: z.string().uuid().nullable().optional(),
 
-  fechasAplicacion: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1).max(12),
+  fechasAplicacion: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1).max(MAX_APPLY_DATES),
   itemIds: z.array(z.string().uuid()).min(1),
 });
 
@@ -69,7 +70,7 @@ export async function PATCH(
   await context.params;
   const body = schema.parse(await request.json());
 
-  const fechas = Array.from(new Set(body.fechasAplicacion)).slice(0, 12);
+  const fechas = Array.from(new Set(body.fechasAplicacion)).slice(0, MAX_APPLY_DATES);
   const parsedDates = fechas.map(parseDate);
   if (parsedDates.some((d) => !d)) {
     return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });

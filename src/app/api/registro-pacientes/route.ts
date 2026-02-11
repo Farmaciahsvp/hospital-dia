@@ -12,6 +12,7 @@ type Row = {
   dosis: string;
   fechasAplicacion: string[];
   fechasAplicacionCumplidas: string[];
+  itemIds: string[];
   farmaceutico: string | null;
 };
 
@@ -65,12 +66,37 @@ export async function GET(request: Request) {
             }
           : {}),
       },
-      include: {
-        medication: true,
+      select: {
+        id: true,
+        medicationId: true,
+        dosisTexto: true,
+        aplicadoAt: true,
+        medication: {
+          select: {
+            codigoInstitucional: true,
+            nombre: true,
+          },
+        },
         prepRequest: {
-          include: {
-            patient: true,
-            pharmacist: true,
+          select: {
+            fechaAplicacion: true,
+            fechaRecepcion: true,
+            numeroReceta: true,
+            pharmacistId: true,
+            patient: {
+              select: {
+                id: true,
+                identificacion: true,
+                nombre: true,
+              },
+            },
+            pharmacist: {
+              select: {
+                codigo: true,
+                nombres: true,
+                apellidos: true,
+              },
+            },
           },
         },
       },
@@ -116,12 +142,14 @@ export async function GET(request: Request) {
           dosis: it.dosisTexto,
           fechasAplicacion: [],
           fechasAplicacionCumplidas: [],
+          itemIds: [],
           farmaceutico,
         } satisfies Row);
 
       const fechaAplicacionIso = pr.fechaAplicacion.toISOString().slice(0, 10);
       existing.fechasAplicacion.push(fechaAplicacionIso);
       if (it.aplicadoAt) existing.fechasAplicacionCumplidas.push(fechaAplicacionIso);
+      existing.itemIds.push(it.id);
       grouped.set(key, existing);
     }
 
@@ -129,6 +157,7 @@ export async function GET(request: Request) {
       ...r,
       fechasAplicacion: Array.from(new Set(r.fechasAplicacion)).sort(),
       fechasAplicacionCumplidas: Array.from(new Set(r.fechasAplicacionCumplidas)).sort(),
+      itemIds: Array.from(new Set(r.itemIds)),
     }));
 
     allRows.sort((a, b) => {

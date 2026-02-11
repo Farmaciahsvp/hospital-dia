@@ -57,9 +57,7 @@ export async function GET(request: Request) {
       adquisicionGroups,
       frecuenciaGroups,
       topMedGroups,
-      dailyRecetas,
-      dailyPatientsGroups,
-      dailyLineas,
+      dailyAgg,
       cancelMotivos,
       cargaFarmacia,
       cargaPrescriptores,
@@ -110,23 +108,18 @@ export async function GET(request: Request) {
         orderBy: { _count: { medicationId: "desc" } },
         take: 10,
       }),
-      prisma.prepRequest.groupBy({
-        by: ["fechaRecepcion"],
-        where: { fechaRecepcion: { gte: from, lt: toExclusive } },
-        _count: { id: true },
-        orderBy: { fechaRecepcion: "asc" },
-      }),
-      prisma.prepRequest.groupBy({
-        by: ["fechaRecepcion", "patientId"],
-        where: { fechaRecepcion: { gte: from, lt: toExclusive } },
-        _count: { id: true },
-        orderBy: { fechaRecepcion: "asc" },
-      }),
-      prisma.prepRequestItem.groupBy({
-        by: ["prepRequestId"],
-        where: { prepRequest: { is: { fechaRecepcion: { gte: from, lt: toExclusive } } } },
-        _count: { prepRequestId: true },
-      }),
+      prisma.$queryRaw<Array<{ fecha: Date | null; recetas: bigint; pacientes: bigint; lineas: bigint }>>(Prisma.sql`
+        SELECT
+          pr."fechaRecepcion"::date AS fecha,
+          COUNT(DISTINCT pr."id")::bigint AS recetas,
+          COUNT(DISTINCT pr."patientId")::bigint AS pacientes,
+          COUNT(i."id")::bigint AS lineas
+        FROM "public"."prep_requests" pr
+        LEFT JOIN "public"."prep_request_items" i ON i."prepRequestId"::text = pr."id"::text
+        WHERE pr."fechaRecepcion" >= ${from} AND pr."fechaRecepcion" < ${toExclusive}
+        GROUP BY fecha
+        ORDER BY fecha ASC
+      `),
       prisma.$queryRaw<Array<{ motivo: string | null; count: bigint }>>(Prisma.sql`
         SELECT COALESCE(i."canceladoMotivo",'SIN MOTIVO') AS motivo, COUNT(*)::bigint AS count
         FROM "public"."prep_request_items" i
@@ -250,48 +243,14 @@ export async function GET(request: Request) {
       lineas: toNumber(r.lineas),
     }));
 
-    const dailyPatientsByDay = new Map<string, Set<string>>();
-    for (const g of dailyPatientsGroups) {
-      const key = g.fechaRecepcion ? g.fechaRecepcion.toISOString().slice(0, 10) : "SIN FECHA";
-      const set = dailyPatientsByDay.get(key) ?? new Set<string>();
-      set.add(g.patientId);
-      dailyPatientsByDay.set(key, set);
-    }
-
-    const lineasByRequestId = new Map<string, number>();
-    for (const g of dailyLineas) {
-      lineasByRequestId.set(g.prepRequestId, g._count.prepRequestId);
-    }
-
-    const recetasByDay = new Map<string, { recetas: number; lineas: number }>();
-    for (const g of dailyRecetas) {
-      const day = g.fechaRecepcion ? g.fechaRecepcion.toISOString().slice(0, 10) : "SIN FECHA";
-      recetasByDay.set(day, { recetas: g._count.id, lineas: 0 });
-    }
-
-    // Approx: distribute line counts by joining prep_requests again (minimal)
-    const reqsForDaily = await prisma.prepRequest.findMany({
-      where: { fechaRecepcion: { gte: from, lt: toExclusive } },
-      select: { id: true, fechaRecepcion: true },
-      take: 20000,
-    });
-    for (const r of reqsForDaily) {
-      const day = r.fechaRecepcion ? r.fechaRecepcion.toISOString().slice(0, 10) : "SIN FECHA";
-      const bucket = recetasByDay.get(day);
-      if (!bucket) continue;
-      bucket.lineas += lineasByRequestId.get(r.id) ?? 0;
-    }
-
-    const days: Array<{ fecha: string; recetas: number; pacientes: number; lineas: number }> = [];
-    for (const [fecha, bucket] of Array.from(recetasByDay.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
-      if (fecha === "SIN FECHA") continue;
-      days.push({
-        fecha,
-        recetas: bucket.recetas,
-        pacientes: dailyPatientsByDay.get(fecha)?.size ?? 0,
-        lineas: bucket.lineas,
-      });
-    }
+    const days = dailyAgg
+      .filter((r) => !!r.fecha)
+      .map((r) => ({
+        fecha: (r.fecha as Date).toISOString().slice(0, 10),
+        recetas: toNumber(r.recetas),
+        pacientes: toNumber(r.pacientes),
+        lineas: toNumber(r.lineas),
+      }));
 
     const entrega = entregasStats[0] ?? { n: BigInt(0), avg_hours: null, p50_hours: null, p90_hours: null, sla4h: null };
 

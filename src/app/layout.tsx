@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Sidebar } from "@/components/Sidebar";
+import { ErrorLogPanel } from "@/components/ErrorLogPanel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,6 +32,7 @@ export default function RootLayout({
             <Sidebar />
             <main className="min-w-0 flex-1">{children}</main>
           </div>
+          <ErrorLogPanel />
         </div>
       </body>
     </html>

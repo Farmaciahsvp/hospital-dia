@@ -4,11 +4,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toISODateString } from "@/lib/date";
+import { MAX_APPLY_DATES } from "@/lib/domain-rules";
 import { STATUS_LABEL, type ItemStatus } from "@/lib/status";
-import { exportConsolidatedPdf, exportPdf, type ExportRow } from "@/lib/export";
+import { exportConsolidatedPdf, exportPdf } from "@/lib/export";
+import {
+  createAgendaItems,
+  deletePrepRequest,
+  duplicateAgendaItem,
+  fetchAgendaItems,
+  fetchMedicationSuggestions,
+  fetchPatientSuggestions,
+  fetchStaffOptions,
+  fetchUltimosRegistros,
+  finalizePrepRequest,
+  patchAgendaItem,
+  patchPatient,
+  patchUltimoRegistro,
+} from "@/components/agenda/agenda-api";
+import { AgendaDesktopActions, AgendaMobileActions } from "@/components/agenda/AgendaItemActions";
+import { AgendaSummaryFooter } from "@/components/agenda/AgendaSummaryFooter";
+import {
+  addMonthsUtc,
+  AgendaItem,
+  buildConsolidatedByMedication,
+  buildPatientsOfDay,
+  buildStatusCounts,
+  formatDMY,
+  isoToUtcDate,
+  MedicationSuggestion,
+  parseDateInputToISO,
+  parseFrequencyStep,
+  PersonOption,
+  personLabel,
+  PatientSuggestion,
+  quickSchema,
+  QuickForm,
+  toExportRows,
+  toMonthInputValue,
+  UltimoRegistro,
+  useDebouncedValue,
+} from "@/components/agenda/agenda-domain";
+import { useAgendaGlobalShortcuts, useWindowClickDismiss } from "@/components/agenda/agenda-hooks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Toast, type ToastState } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
@@ -20,7 +58,6 @@ import { NavPills } from "@/components/NavPills";
 import {
   BookOpen,
   FileText,
-  MoreHorizontal,
   Plus,
   Printer,
   RefreshCw,
@@ -31,225 +68,6 @@ import {
   Stethoscope,
   UserRound,
 } from "lucide-react";
-
-type PatientSuggestion = { id: string; identificacion: string; nombre: string | null };
-type MedicationSuggestion = {
-  id: string;
-  codigoInstitucional: string | null;
-  nombre: string;
-  label: string;
-};
-
-type AgendaItem = {
-  id: string;
-  prepRequestId?: string;
-  patientId?: string;
-  fechaAplicacion: string;
-  estado: ItemStatus;
-  identificacion: string;
-  nombre: string | null;
-  medicamento: string;
-  dosisTexto: string;
-  unidadesRequeridas: number;
-  frecuencia?: string | null;
-  adquisicion?: "almacenable" | "compra_local";
-  observaciones: string | null;
-  canceladoMotivo?: string | null;
-  updatedAt: string;
-};
-
-type UltimoRegistro = {
-  id: string;
-  patientId: string;
-  fecha: string;
-  cedula: string;
-  nombre: string | null;
-  medicationId: string;
-  medicamento: string;
-  dosisTexto: string;
-  unidadesRequeridas: number;
-  frecuencia: string | null;
-  fechasAplicacion: string[];
-  fechaRecepcion: string | null;
-  numeroReceta: string | null;
-  prescriberId: string | null;
-  pharmacistId: string | null;
-  adquisicion: "almacenable" | "compra_local";
-  observaciones: string | null;
-  itemIds: string[];
-};
-
-type PersonOption = {
-  id: string;
-  codigo: string;
-  nombres: string;
-  apellidos: string;
-};
-
-const MAX_APPLY_DATES = 16;
-
-const quickSchema = z.object({
-  fechaRecepcion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Requerido" }),
-  numeroReceta: z
-    .string()
-    .transform((v) => v.replace(/\D/g, "").slice(0, 6))
-    .refine((v) => /^\d{6}$/.test(v), { message: "Debe ser de 6 dígitos" }),
-  prescriberTexto: z.string().trim().min(1, "Requerido"),
-  prescriberId: z.string().uuid({ message: "Seleccione un prescriptor de la lista" }),
-  pharmacistTexto: z.string().trim().min(1, "Requerido"),
-  pharmacistId: z.string().uuid({ message: "Seleccione un farmacéutico de la lista" }),
-  claveAutorizacion: z.string().trim().max(100).optional(),
-  identificacion: z.string().trim().min(1, "Requerido"),
-  nombre: z.string().trim().min(1, "Requerido"),
-  medicamentoId: z.string().uuid({ message: "Seleccione un medicamento de la lista" }),
-  medicamentoTexto: z.string().trim().min(1),
-  dosisTexto: z.string().trim().min(1),
-  unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
-  totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive().max(MAX_APPLY_DATES)),
-  frecuencia: z.string().trim().min(1, "Requerido").max(50),
-  adquisicion: z.enum(["almacenable", "compra_local"]),
-  observaciones: z.string().trim().max(300).optional(),
-  recursoAmparo: z.boolean().optional(),
-});
-
-type QuickForm = z.infer<typeof quickSchema>;
-
-function personLabel(p: PersonOption) {
-  return `${p.codigo} - ${p.nombres} ${p.apellidos}`.trim();
-}
-
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-function toMonthInputValue(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
-}
-
-function useDebouncedValue<T>(value: T, delayMs: number) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(t);
-  }, [value, delayMs]);
-  return debounced;
-}
-
-function toExportRows(items: AgendaItem[]): ExportRow[] {
-  return items.map((i) => ({
-    fechaAplicacion: i.fechaAplicacion,
-    identificacion: i.identificacion,
-    nombre: i.nombre,
-    medicamento: i.medicamento,
-    dosis: i.dosisTexto,
-    unidades: i.unidadesRequeridas,
-    estado: i.estado,
-    observaciones: i.observaciones,
-  }));
-}
-
-function formatDMY(dateStr: string) {
-  const [y, m, d] = dateStr.split("-");
-  if (!y || !m || !d) return dateStr;
-  return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
-}
-
-function parseDateInputToISO(raw: string): string | null {
-  const value = raw.trim();
-  if (!value) return null;
-
-  const isValid = (y: number, m: number, d: number) => {
-    if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return false;
-    if (y < 1900 || y > 2100) return false;
-    if (m < 1 || m > 12) return false;
-    if (d < 1) return false;
-    const daysInMonth = new Date(y, m, 0).getDate();
-    return d <= daysInMonth;
-  };
-
-  const toIso = (y: number, m: number, d: number) =>
-    `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-
-  const ymd = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (ymd) {
-    const y = Number(ymd[1]);
-    const m = Number(ymd[2]);
-    const d = Number(ymd[3]);
-    return isValid(y, m, d) ? toIso(y, m, d) : null;
-  }
-
-  const dmy = value.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
-  if (dmy) {
-    const d = Number(dmy[1]);
-    const m = Number(dmy[2]);
-    const y = Number(dmy[3]);
-    return isValid(y, m, d) ? toIso(y, m, d) : null;
-  }
-
-  const digits = value.match(/^(\d{8})$/);
-  if (digits) {
-    const s = digits[1];
-    const first4 = Number(s.slice(0, 4));
-    const last4 = Number(s.slice(4));
-    if (first4 >= 1900 && first4 <= 2100) {
-      const y = first4;
-      const m = Number(s.slice(4, 6));
-      const d = Number(s.slice(6, 8));
-      return isValid(y, m, d) ? toIso(y, m, d) : null;
-    }
-    if (last4 >= 1900 && last4 <= 2100) {
-      const d = Number(s.slice(0, 2));
-      const m = Number(s.slice(2, 4));
-      const y = last4;
-      return isValid(y, m, d) ? toIso(y, m, d) : null;
-    }
-  }
-
-  return null;
-}
-
-type FrequencyStep = { kind: "days"; value: number } | { kind: "months"; value: number };
-
-function parseFrequencyStep(raw: string | null | undefined): FrequencyStep | null {
-  const value = (raw ?? "").trim();
-  if (!value) return null;
-
-  const norm = value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const cadaMatch = norm.match(/\bCADA\s+(\d+)\s*(H|HRS|HORAS|DIA|DIAS|SEMANA|SEMANAS|MES|MESES)\b/);
-  if (cadaMatch) {
-    const n = Number.parseInt(cadaMatch[1] ?? "", 10);
-    if (!Number.isFinite(n) || n <= 0) return null;
-    const unit = cadaMatch[2] ?? "";
-    if (unit === "H" || unit === "HRS" || unit === "HORAS") return null;
-    if (unit === "DIA" || unit === "DIAS") return { kind: "days", value: n };
-    if (unit === "SEMANA" || unit === "SEMANAS") return { kind: "days", value: n * 7 };
-    if (unit === "MES" || unit === "MESES") return { kind: "months", value: n };
-  }
-
-  if (/\bDIARIO\b|\bDIARIA\b/.test(norm)) return { kind: "days", value: 1 };
-  if (/\bSEMANAL\b/.test(norm)) return { kind: "days", value: 7 };
-  if (/\bQUINCENAL\b/.test(norm)) return { kind: "days", value: 15 };
-  if (/\bMENSUAL\b/.test(norm)) return { kind: "months", value: 1 };
-  if (/\bBIMENSUAL\b/.test(norm)) return { kind: "months", value: 2 };
-  if (/\bTRIMESTRAL\b/.test(norm)) return { kind: "months", value: 3 };
-  if (/\bANUAL\b/.test(norm)) return { kind: "months", value: 12 };
-
-  return null;
-}
-
-function isoToUtcDate(iso: string) {
-  return new Date(`${iso}T00:00:00.000Z`);
-}
-
-function addMonthsUtc(date: Date, months: number) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
-}
 
 export function AgendaDia() {
   useRouter();
@@ -323,25 +141,12 @@ export function AgendaDia() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const statusParam = Array.from(statusFilter).join(",");
-      const url = new URL("/api/items", window.location.origin);
-      url.searchParams.set("date", fechaStr);
-      if (debouncedPatient.trim()) url.searchParams.set("patient", debouncedPatient.trim());
-      if (debouncedMedication.trim()) url.searchParams.set("med", debouncedMedication.trim());
-      if (statusParam) url.searchParams.set("status", statusParam);
-
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      if (!res.ok) {
-        let message = "No se pudo cargar la agenda";
-        try {
-          const data = (await res.json()) as { error?: string };
-          if (data?.error) message = `${message}: ${data.error}`;
-        } catch {
-          // ignore
-        }
-        throw new Error(message);
-      }
-      const data = (await res.json()) as { items: AgendaItem[]; serverTime: string };
+      const data = await fetchAgendaItems({
+        date: fechaStr,
+        patientQuery: debouncedPatient,
+        medicationQuery: debouncedMedication,
+        statuses: Array.from(statusFilter),
+      });
       setItems(data.items);
       setLastUpdated(data.serverTime);
     } catch (e) {
@@ -356,58 +161,17 @@ export function AgendaDia() {
   }, [refresh]);
 
   const counts = useMemo(() => {
-    const c: Record<ItemStatus, number> = {
-      pendiente: 0,
-      en_preparacion: 0,
-      listo: 0,
-      entregado: 0,
-      cancelado: 0,
-    };
-    for (const i of items) c[i.estado]++;
-    return c;
+    return buildStatusCounts(items);
   }, [items]);
 
   const exportRows = useMemo(() => toExportRows(items), [items]);
 
   const consolidated = useMemo(() => {
-    const map = new Map<string, { medicamento: string; unidades: number; lineas: number }>();
-    for (const i of items) {
-      const current =
-        map.get(i.medicamento) ?? { medicamento: i.medicamento, unidades: 0, lineas: 0 };
-      current.unidades += i.unidadesRequeridas;
-      current.lineas += 1;
-      map.set(i.medicamento, current);
-    }
-    return Array.from(map.values()).sort((a, b) => a.medicamento.localeCompare(b.medicamento));
+    return buildConsolidatedByMedication(items);
   }, [items]);
 
   const patientsOfDay = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        patientId: string;
-        prepRequestId: string;
-        identificacion: string;
-        nombre: string;
-        itemsCount: number;
-      }
-    >();
-    for (const it of items) {
-      if (!it.patientId || !it.prepRequestId) continue;
-      const key = it.patientId;
-      const current =
-        map.get(key) ??
-        {
-          patientId: it.patientId,
-          prepRequestId: it.prepRequestId,
-          identificacion: it.identificacion,
-          nombre: it.nombre ?? "",
-          itemsCount: 0,
-        };
-      current.itemsCount += 1;
-      map.set(key, current);
-    }
-    return Array.from(map.values()).sort((a, b) => a.identificacion.localeCompare(b.identificacion));
+    return buildPatientsOfDay(items);
   }, [items]);
 
   const { register, handleSubmit, setValue, reset, formState, getValues } = useForm<QuickForm>({
@@ -485,30 +249,19 @@ export function AgendaDia() {
   );
 
   const loadPatientSuggestions = useCallback(async (query: string) => {
-    const url = new URL("/api/patients", window.location.origin);
-    url.searchParams.set("query", query);
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    if (!res.ok) return;
-    setPatientSuggestions((await res.json()) as PatientSuggestion[]);
+    setPatientSuggestions(await fetchPatientSuggestions(query));
   }, []);
 
   const loadMedSuggestions = useCallback(async (query: string) => {
-    const url = new URL("/api/medications", window.location.origin);
-    url.searchParams.set("query", query);
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    if (!res.ok) return;
-    setMedSuggestions((await res.json()) as MedicationSuggestion[]);
+    setMedSuggestions(await fetchMedicationSuggestions(query));
   }, []);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [prescRes, pharmRes] = await Promise.all([
-          fetch("/api/prescribers", { cache: "no-store" }),
-          fetch("/api/pharmacists", { cache: "no-store" }),
-        ]);
-        if (prescRes.ok) setPrescribers((await prescRes.json()) as PersonOption[]);
-        if (pharmRes.ok) setPharmacists((await pharmRes.json()) as PersonOption[]);
+        const staff = await fetchStaffOptions();
+        setPrescribers(staff.prescribers);
+        setPharmacists(staff.pharmacists);
       } catch {
         // ignore
       }
@@ -518,12 +271,7 @@ export function AgendaDia() {
   const loadUltimos = useCallback(async () => {
     setLoadingUltimos(true);
     try {
-      const url = new URL("/api/ultimos-registros", window.location.origin);
-      if (ultimosMonth) url.searchParams.set("month", ultimosMonth);
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      const data = (await res.json()) as { rows?: UltimoRegistro[]; error?: string };
-      if (!res.ok) throw new Error(data.error || "No se pudo cargar");
-      setUltimos(data.rows ?? []);
+      setUltimos(await fetchUltimosRegistros(ultimosMonth));
     } catch (e) {
       setUltimos([]);
       setToast({ kind: "error", message: e instanceof Error ? e.message : "Error" });
@@ -542,35 +290,30 @@ export function AgendaDia() {
     try {
       const fechasAplicacion = Array.from(new Set(applyDates.filter(Boolean))).slice(0, MAX_APPLY_DATES);
       if (!fechasAplicacion.length) throw new Error("Debe indicar al menos una fecha de aplicación");
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          fechasAplicacion,
-          fechaRecepcion: values.fechaRecepcion,
-          numeroReceta: values.numeroReceta.replace(/\D/g, "").slice(0, 6),
-          prescriberId: values.prescriberId,
-          pharmacistId: values.pharmacistId,
-          patient: { identificacion: values.identificacion, nombre: values.nombre },
-          medication: { id: values.medicamentoId, nombre: values.medicamentoTexto },
-          dosisTexto: values.dosisTexto,
-          unidadesRequeridas: values.unidadesRequeridas,
-          frecuencia: values.frecuencia,
-          adquisicion: values.adquisicion,
-          observaciones:
-            values.claveAutorizacion?.trim() || values.observaciones?.trim()
-              ? [
-                values.claveAutorizacion?.trim() ? `Clave autorización: ${values.claveAutorizacion.trim()}` : null,
-                values.observaciones?.trim() ? values.observaciones.trim() : null,
-              ]
-                .filter(Boolean)
-                .join(" | ")
-              : null,
-          recursoAmparo: values.recursoAmparo,
-          createdBy: "farmacia",
-        }),
+      await createAgendaItems({
+        fechasAplicacion,
+        fechaRecepcion: values.fechaRecepcion,
+        numeroReceta: values.numeroReceta.replace(/\D/g, "").slice(0, 6),
+        prescriberId: values.prescriberId,
+        pharmacistId: values.pharmacistId,
+        patient: { identificacion: values.identificacion, nombre: values.nombre },
+        medication: { id: values.medicamentoId, nombre: values.medicamentoTexto },
+        dosisTexto: values.dosisTexto,
+        unidadesRequeridas: values.unidadesRequeridas,
+        frecuencia: values.frecuencia,
+        adquisicion: values.adquisicion,
+        observaciones:
+          values.claveAutorizacion?.trim() || values.observaciones?.trim()
+            ? [
+              values.claveAutorizacion?.trim() ? `Clave autorización: ${values.claveAutorizacion.trim()}` : null,
+              values.observaciones?.trim() ? values.observaciones.trim() : null,
+            ]
+              .filter(Boolean)
+              .join(" | ")
+            : null,
+        recursoAmparo: values.recursoAmparo,
+        createdBy: "farmacia",
       });
-      if (!res.ok) throw new Error("No se pudo guardar");
       setToast({
         kind: "success",
         message:
@@ -663,15 +406,10 @@ export function AgendaDia() {
   const savePatient = useCallback(async () => {
     if (!editPatient) return;
     try {
-      const res = await fetch(`/api/patients/${editPatient.patientId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          identificacion: editPatient.identificacion,
-          nombre: editPatient.nombre || null,
-        }),
+      await patchPatient(editPatient.patientId, {
+        identificacion: editPatient.identificacion,
+        nombre: editPatient.nombre || null,
       });
-      if (!res.ok) throw new Error("No se pudo actualizar el paciente");
       setToast({ kind: "success", message: "Paciente actualizado" });
       setEditPatient(null);
       await refresh();
@@ -683,10 +421,7 @@ export function AgendaDia() {
   const deletePatientFromDay = useCallback(async () => {
     if (!deletePatientReq) return;
     try {
-      const res = await fetch(`/api/prep-requests/${deletePatientReq.prepRequestId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("No se pudo eliminar");
+      await deletePrepRequest(deletePatientReq.prepRequestId);
       setToast({ kind: "success", message: "Eliminado" });
       setDeletePatientReq(null);
       await refresh();
@@ -698,12 +433,7 @@ export function AgendaDia() {
   const finalizePatient = useCallback(async () => {
     if (!finalizePatientReq) return;
     try {
-      const res = await fetch(`/api/prep-requests/${finalizePatientReq.prepRequestId}/finalize`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ finalizadoBy: "farmacia" }),
-      });
-      if (!res.ok) throw new Error("No se pudo finalizar");
+      await finalizePrepRequest(finalizePatientReq.prepRequestId, { finalizadoBy: "farmacia" });
       setToast({ kind: "success", message: "Paciente finalizado" });
       setFinalizePatientReq(null);
       await refresh();
@@ -719,17 +449,12 @@ export function AgendaDia() {
         canceladoMotivo?: string | null;
       },
     ) => {
-      const res = await fetch(`/api/items/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ...patch,
-          updatedBy: "farmacia",
-          entregadoAt: patch.estado === "entregado" ? new Date().toISOString() : undefined,
-          canceladoMotivo: patch.canceladoMotivo,
-        }),
+      await patchAgendaItem(id, {
+        ...patch,
+        updatedBy: "farmacia",
+        entregadoAt: patch.estado === "entregado" ? new Date().toISOString() : undefined,
+        canceladoMotivo: patch.canceladoMotivo,
       });
-      if (!res.ok) throw new Error("No se pudo actualizar");
       setToast({ kind: "success", message: "Actualizado" });
       await refresh();
     },
@@ -738,12 +463,7 @@ export function AgendaDia() {
 
   const duplicateItem = useCallback(
     async (id: string) => {
-      const res = await fetch(`/api/items/${id}/duplicate`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ createdBy: "farmacia" }),
-      });
-      if (!res.ok) throw new Error("No se pudo duplicar");
+      await duplicateAgendaItem(id, { createdBy: "farmacia" });
       setToast({ kind: "success", message: "Duplicado" });
       await refresh();
     },
@@ -777,33 +497,15 @@ export function AgendaDia() {
     cancelEdit();
   }, [cancelEdit, editDraft, editId, updateItem]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && editId) cancelEdit();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        quickIdentRef.current?.focus();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        window.print();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [cancelEdit, editId]);
+  useAgendaGlobalShortcuts({
+    editId,
+    onCancelEdit: cancelEdit,
+    onFocusNew: () => quickIdentRef.current?.focus(),
+    onPrint: () => window.print(),
+  });
 
-  useEffect(() => {
-    const onClick = () => setMenuId(null);
-    window.addEventListener("click", onClick);
-    return () => window.removeEventListener("click", onClick);
-  }, []);
-
-  useEffect(() => {
-    const onClick = () => setStatusMenuOpen(false);
-    window.addEventListener("click", onClick);
-    return () => window.removeEventListener("click", onClick);
-  }, []);
+  useWindowClickDismiss(() => setMenuId(null));
+  useWindowClickDismiss(() => setStatusMenuOpen(false));
 
   return (
     <div className="min-h-screen bg-transparent text-zinc-900">
@@ -1694,98 +1396,26 @@ export function AgendaDia() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-center print:hidden">
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50"
-                          onClick={() => void updateItem(i.id, { estado: "listo" })}
-                          type="button"
-                        >
-                          Listo
-                        </button>
-                        <button
-                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50"
-                          onClick={() => void updateItem(i.id, { estado: "entregado" })}
-                          type="button"
-                        >
-                          Entregado
-                        </button>
-                        {editId === i.id ? (
-                          <>
-                            <button
-                              className="rounded-md bg-emerald-600 px-2 py-1 text-xs text-white hover:bg-emerald-500"
-                              onClick={() => void saveEdit()}
-                              type="button"
-                            >
-                              Guardar
-                            </button>
-                            <button
-                              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50"
-                              onClick={() => cancelEdit()}
-                              type="button"
-                            >
-                              Esc
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50"
-                              onClick={() => startEdit(i)}
-                              type="button"
-                            >
-                              Editar
-                            </button>
-                            <div className="relative">
-                              <button
-                                className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setMenuId((prev) => (prev === i.id ? null : i.id));
-                                }}
-                                type="button"
-                                aria-label="Más acciones"
-                              >
-                                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                              </button>
-                              {menuId === i.id ? (
-                                <div
-                                  className="absolute right-0 top-9 z-10 w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
-                                    type="button"
-                                    onClick={() => void duplicateItem(i.id)}
-                                  >
-                                    Duplicar
-                                  </button>
-                                  <button
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
-                                    type="button"
-                                    onClick={() => {
-                                      setMenuId(null);
-                                      setObsItem(i);
-                                    }}
-                                  >
-                                    Observaciones…
-                                  </button>
-                                  <button
-                                    className="w-full px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"
-                                    type="button"
-                                    onClick={() => {
-                                      setMenuId(null);
-                                      setCancelItem(i);
-                                      setCancelMotivo(i.canceladoMotivo ?? "");
-                                    }}
-                                  >
-                                    Cancelar…
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <AgendaDesktopActions
+                        isEditing={editId === i.id}
+                        menuOpen={menuId === i.id}
+                        onSetMenuOpen={(open) => setMenuId(open ? i.id : null)}
+                        onMarkListo={() => void updateItem(i.id, { estado: "listo" })}
+                        onMarkEntregado={() => void updateItem(i.id, { estado: "entregado" })}
+                        onStartEdit={() => startEdit(i)}
+                        onSaveEdit={() => void saveEdit()}
+                        onCancelEdit={cancelEdit}
+                        onDuplicate={() => void duplicateItem(i.id)}
+                        onOpenObs={() => {
+                          setMenuId(null);
+                          setObsItem(i);
+                        }}
+                        onOpenCancel={() => {
+                          setMenuId(null);
+                          setCancelItem(i);
+                          setCancelMotivo(i.canceladoMotivo ?? "");
+                        }}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -1825,47 +1455,17 @@ export function AgendaDia() {
                       <div className="mt-0.5">{i.unidadesRequeridas}</div>
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2 print:hidden">
-                    <button
-                      className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs hover:bg-zinc-50"
-                      onClick={() => void updateItem(i.id, { estado: "listo" })}
-                      type="button"
-                    >
-                      Listo
-                    </button>
-                    <button
-                      className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs hover:bg-zinc-50"
-                      onClick={() => void updateItem(i.id, { estado: "entregado" })}
-                      type="button"
-                    >
-                      Entregado
-                    </button>
-                    <button
-                      className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs hover:bg-zinc-50 disabled:opacity-50"
-                      onClick={() => setObsItem(i)}
-                      type="button"
-                      disabled={!i.observaciones}
-                    >
-                      Obs
-                    </button>
-                    <button
-                      className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs hover:bg-zinc-50"
-                      onClick={() => void duplicateItem(i.id)}
-                      type="button"
-                    >
-                      Duplicar
-                    </button>
-                    <button
-                      className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-100"
-                      onClick={() => {
-                        setCancelItem(i);
-                        setCancelMotivo(i.canceladoMotivo ?? "");
-                      }}
-                      type="button"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
+                  <AgendaMobileActions
+                    hasObservaciones={!!i.observaciones}
+                    onMarkListo={() => void updateItem(i.id, { estado: "listo" })}
+                    onMarkEntregado={() => void updateItem(i.id, { estado: "entregado" })}
+                    onOpenObs={() => setObsItem(i)}
+                    onDuplicate={() => void duplicateItem(i.id)}
+                    onOpenCancel={() => {
+                      setCancelItem(i);
+                      setCancelMotivo(i.canceladoMotivo ?? "");
+                    }}
+                  />
                 </div>
               ))}
               {!items.length ? (
@@ -1876,21 +1476,7 @@ export function AgendaDia() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-zinc-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap justify-center gap-4 text-sm text-zinc-700 md:justify-start">
-              <span>Pendientes: {counts.pendiente}</span>
-              <span>Listos: {counts.listo}</span>
-              <span>Entregados: {counts.entregado}</span>
-              <span>Cancelados: {counts.cancelado}</span>
-            </div>
-            <div className="text-center text-sm text-zinc-500 md:text-right">
-              Última actualización: {lastUpdated ? new Date(lastUpdated).toLocaleString() : "—"}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 text-xs text-zinc-500 print:hidden">
-          Atajos: Enter (guardar), Ctrl+N (nuevo), Ctrl+P (imprimir), Esc (cancelar edición).
+          <AgendaSummaryFooter counts={counts} lastUpdated={lastUpdated} />
         </div>
       </div>
 
@@ -1926,32 +1512,26 @@ export function AgendaDia() {
                   try {
                     const fechasAplicacion = Array.from(new Set(editDates.filter(Boolean))).slice(0, MAX_APPLY_DATES);
                     if (!fechasAplicacion.length) throw new Error("Debe indicar al menos una fecha de aplicación");
-                    const res = await fetch(`/api/ultimos-registros/${editUltimo.id}`, {
-                      method: "PATCH",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({
-                        patientId: editUltimo.patientId,
-                        identificacion: editUltimo.cedula,
-                        nombre: editUltimo.nombre ?? null,
-                        medication: {
-                          id: editMedicationId,
-                          nombre: editMedicationTexto,
-                        },
-                        dosisTexto: editUltimo.dosisTexto,
-                        unidadesRequeridas: editUltimo.unidadesRequeridas,
-                        frecuencia: editUltimo.frecuencia ?? null,
-                        adquisicion: editUltimo.adquisicion,
-                        observaciones: editUltimo.observaciones ?? null,
-                        fechaRecepcion: editUltimo.fechaRecepcion ?? null,
-                        numeroReceta: editUltimo.numeroReceta ?? null,
-                        prescriberId: editUltimo.prescriberId ?? null,
-                        pharmacistId: editUltimo.pharmacistId ?? null,
-                        fechasAplicacion,
-                        itemIds: editUltimo.itemIds,
-                      }),
+                    await patchUltimoRegistro(editUltimo.id, {
+                      patientId: editUltimo.patientId,
+                      identificacion: editUltimo.cedula,
+                      nombre: editUltimo.nombre ?? null,
+                      medication: {
+                        id: editMedicationId,
+                        nombre: editMedicationTexto,
+                      },
+                      dosisTexto: editUltimo.dosisTexto,
+                      unidadesRequeridas: editUltimo.unidadesRequeridas,
+                      frecuencia: editUltimo.frecuencia ?? null,
+                      adquisicion: editUltimo.adquisicion,
+                      observaciones: editUltimo.observaciones ?? null,
+                      fechaRecepcion: editUltimo.fechaRecepcion ?? null,
+                      numeroReceta: editUltimo.numeroReceta ?? null,
+                      prescriberId: editUltimo.prescriberId ?? null,
+                      pharmacistId: editUltimo.pharmacistId ?? null,
+                      fechasAplicacion,
+                      itemIds: editUltimo.itemIds,
                     });
-                    const data = (await res.json()) as { error?: string };
-                    if (!res.ok) throw new Error(data.error || "No se pudo guardar");
                     setToast({ kind: "success", message: "ACTUALIZADO" });
                     setEditUltimo(null);
                     setEditDates([]);
@@ -2331,6 +1911,3 @@ export function AgendaDia() {
     </div>
   );
 }
-
-
-

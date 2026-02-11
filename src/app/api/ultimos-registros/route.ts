@@ -59,11 +59,36 @@ export async function GET(request: Request) {
             },
           }
         : undefined,
-      include: {
-        medication: true,
+      select: {
+        id: true,
+        medicationId: true,
+        dosisTexto: true,
+        unidadesRequeridas: true,
+        frecuencia: true,
+        adquisicion: true,
+        observaciones: true,
+        createdAt: true,
+        medication: {
+          select: {
+            codigoInstitucional: true,
+            nombre: true,
+          },
+        },
         prepRequest: {
-          include: {
-            patient: true,
+          select: {
+            patientId: true,
+            fechaAplicacion: true,
+            fechaRecepcion: true,
+            numeroReceta: true,
+            prescriberId: true,
+            pharmacistId: true,
+            patient: {
+              select: {
+                id: true,
+                identificacion: true,
+                nombre: true,
+              },
+            },
           },
         },
       },

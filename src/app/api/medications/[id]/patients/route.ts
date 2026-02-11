@@ -37,8 +37,19 @@ export async function GET(
           },
         },
       },
-      include: {
-        prepRequest: { include: { patient: true } },
+      select: {
+        prepRequest: {
+          select: {
+            patient: {
+              select: {
+                id: true,
+                identificacion: true,
+                nombre: true,
+              },
+            },
+            fechaAplicacion: true,
+          },
+        },
       },
       orderBy: [{ updatedAt: "desc" }],
       take: 5000,
