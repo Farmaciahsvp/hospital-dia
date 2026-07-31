@@ -20,6 +20,27 @@ enum AcquisitionType {
   compra_local
 }
 
+enum AppRole {
+  administrator
+  pharmacist
+  auditor
+}
+
+model AppUser {
+  id          String   @id @default(uuid()) @db.Uuid
+  authUserId  String   @unique @db.Uuid
+  email       String   @unique
+  displayName String
+  role        AppRole  @default(auditor)
+  active      Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, role])
+  @@map("app_users")
+}
+
 model Patient {
   id             String        @id @default(uuid())
   identificacion String        @unique

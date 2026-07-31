@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ItemStatus } from "@prisma/client";
 import { DUPLICATE_WINDOW_MS, MAX_APPLY_DATES } from "@/lib/domain-rules";
 import { getRequestId } from "@/lib/api-server";
+import { getRequestIdentity } from "@/lib/auth/request-identity";
 
 function parseDateParam(raw: string | null) {
   if (!raw) return null;
@@ -175,6 +176,7 @@ const createItemSchema = z.object({
 
 export async function POST(request: Request) {
   const body = createItemSchema.parse(await request.json());
+  const actor = getRequestIdentity(request)?.auditLabel ?? body.createdBy ?? null;
   const rawDates = body.fechasAplicacion?.length
     ? body.fechasAplicacion
     : body.fechaAplicacion
@@ -225,7 +227,7 @@ export async function POST(request: Request) {
       const prepRequest = await tx.prepRequest.upsert({
         where: { fechaAplicacion_patientId: { fechaAplicacion: fecha, patientId: patient.id } },
         update: {
-          updatedBy: body.createdBy ?? undefined,
+          updatedBy: actor ?? undefined,
           fechaRecepcion,
           numeroReceta: body.numeroReceta,
           prescriberId: body.prescriberId,
@@ -240,8 +242,8 @@ export async function POST(request: Request) {
           prescriberId: body.prescriberId,
           pharmacistId: body.pharmacistId,
           recursoAmparo: body.recursoAmparo ?? false,
-          createdBy: body.createdBy ?? null,
-          updatedBy: body.createdBy ?? null,
+          createdBy: actor,
+          updatedBy: actor,
         },
       });
 
@@ -274,8 +276,8 @@ export async function POST(request: Request) {
           frecuencia: normalizedFrecuencia,
           adquisicion: normalizedAdquisicion,
           observaciones: normalizedObservaciones,
-          createdBy: body.createdBy ?? null,
-          updatedBy: body.createdBy ?? null,
+          createdBy: actor,
+          updatedBy: actor,
         },
       });
       createdIds.push(item.id);

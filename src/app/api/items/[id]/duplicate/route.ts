@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getRequestIdentity } from "@/lib/auth/request-identity";
 
 const schema = z.object({
   createdBy: z.string().trim().min(1).nullable().optional(),
@@ -12,6 +13,7 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const body = schema.parse(await request.json().catch(() => ({})));
+  const actor = getRequestIdentity(request)?.auditLabel ?? body.createdBy ?? null;
 
   const item = await prisma.prepRequestItem.findUnique({ where: { id } });
   if (!item) return NextResponse.json({ error: "No existe" }, { status: 404 });
@@ -26,8 +28,8 @@ export async function POST(
       frecuencia: item.frecuencia,
       adquisicion: item.adquisicion,
       observaciones: item.observaciones,
-      createdBy: body.createdBy ?? null,
-      updatedBy: body.createdBy ?? null,
+      createdBy: actor,
+      updatedBy: actor,
     },
   });
 
