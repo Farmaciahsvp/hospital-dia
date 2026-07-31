@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getRequestIdentity } from "@/lib/auth/request-identity";
 
 const patchSchema = z.object({
   estado: z
@@ -20,6 +21,7 @@ export async function PATCH(
 ) {
   const { id } = await context.params;
   const body = patchSchema.parse(await request.json());
+  const actor = getRequestIdentity(request)?.auditLabel;
 
   const updated = await prisma.prepRequestItem.update({
     where: { id },
@@ -30,7 +32,11 @@ export async function PATCH(
         ? { unidadesRequeridas: body.unidadesRequeridas }
         : {}),
       ...(body.observaciones !== undefined ? { observaciones: body.observaciones } : {}),
-      ...(body.updatedBy !== undefined ? { updatedBy: body.updatedBy } : {}),
+      ...(actor
+        ? { updatedBy: actor }
+        : body.updatedBy !== undefined
+          ? { updatedBy: body.updatedBy }
+          : {}),
       ...(body.entregadoAt !== undefined
         ? { entregadoAt: body.entregadoAt ? new Date(body.entregadoAt) : null }
         : {}),
