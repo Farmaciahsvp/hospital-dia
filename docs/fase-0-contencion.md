@@ -2,7 +2,7 @@
 
 ## Estado
 
-Los cambios locales incluyen una barrera temporal HTTP Basic que se activa
+Producción incluye una barrera temporal HTTP Basic que se activa
 siempre en producción y en Vercel. Esta barrera protege páginas y rutas
 `/api/*`.
 
@@ -13,16 +13,15 @@ configuración deje accesibles los datos.
 Esta barrera es una medida temporal. No sustituye autenticación institucional,
 autorización por rol, sesiones individuales ni auditoría por usuario.
 
-### Pendientes externos
+### Pendiente de la fase
 
-Estos cambios todavía no están publicados. Para cerrar la fase se requiere
-acceso autenticado a las cuentas que administran el proyecto real:
+La contención, el respaldo y la verificación de recuperación están completos.
+Para cerrar la fase organizativa todavía se requiere:
 
-- Configurar las variables y desplegar en el proyecto Vercel correcto.
 - Aprobar la matriz de roles.
 
-No se debe interpretar la existencia de este documento como evidencia de que
-la protección de producción ya fue publicada.
+La autenticación HTTP Basic sigue siendo temporal y compartida; la matriz
+aprobada será la base de la autenticación individual definitiva.
 
 ### Respaldo y restauración verificados — 2026-07-30
 
@@ -80,6 +79,28 @@ No se activó ninguna opción de pago. Las credenciales de la barrera quedaron
 protegidas localmente con DPAPI y excluidas de Git. El usuario propietario
 puede recuperarlas con `scripts/show-phase0-access.ps1`.
 
+### Publicación productiva — 2026-07-30
+
+- Pull request: `Farmaciahsvp/hospital-dia#1`.
+- Commit de seguridad: `b493559`.
+- Commit de `main`: `1c150f5`.
+- Deployment Vercel: `5nehAa4ogeNpL1fcv6BqawRgkQez`.
+- Estado observado: `Ready`, `Current`, Production.
+- Dominio verificado: `https://hospital-dia.vercel.app`.
+- Resultado HTTP:
+  - `/` sin credenciales: 401.
+  - `/api/health` sin credenciales: 401.
+  - `/` con contraseña incorrecta: 401.
+  - `/` con credenciales correctas: 200.
+  - `/api/health` con credenciales correctas: 200 y `status: ok`.
+  - `/api/medications` y `/api/patients` con credenciales correctas: 200.
+- Encabezados confirmados: `WWW-Authenticate`, `X-Robots-Tag`,
+  `Cache-Control: private, no-store`, y `X-Frame-Options: DENY`.
+- Logs del deployment en los últimos 30 minutos: cero warnings, errores o
+  eventos fatales.
+- No se ejecutaron migraciones, escrituras ni restauraciones sobre el proyecto
+  Supabase productivo.
+
 ### Verificación de Supabase — 2026-07-30
 
 - Organización: `fhsvp2208`.
@@ -100,7 +121,7 @@ la restauración del respaldo cifrado.
 
 ## Activación en Vercel
 
-Antes de desplegar:
+Procedimiento aplicado:
 
 1. Generar una contraseña aleatoria de al menos 32 caracteres.
 2. En el proyecto `hospital-dia`, agregar para Production y Preview:
