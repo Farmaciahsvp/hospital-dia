@@ -33,6 +33,7 @@ model AppUser {
   displayName String
   role        AppRole  @default(auditor)
   active      Boolean  @default(true)
+  mustChangePassword Boolean @default(true)
   lastLoginAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

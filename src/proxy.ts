@@ -17,6 +17,7 @@ type AppProfile = {
   displayName: string;
   role: string;
   active: boolean;
+  mustChangePassword: boolean;
 };
 
 const PUBLIC_INDIVIDUAL_PATHS = new Set([
@@ -29,6 +30,7 @@ const VERIFIED_IDENTITY_HEADERS = [
   "x-app-user-email",
   "x-app-user-name",
   "x-app-user-role",
+  "x-app-must-change-password",
   "x-app-auth-mode",
 ];
 
@@ -187,7 +189,7 @@ async function authenticateIndividual(
 
   const { data, error } = await supabase
     .from("app_users")
-    .select("authUserId,email,displayName,role,active")
+    .select("authUserId,email,displayName,role,active,mustChangePassword")
     .eq("authUserId", subject)
     .maybeSingle();
 
@@ -253,6 +255,27 @@ export async function proxy(request: NextRequest) {
       return forbiddenResponse(request, authResponse);
     }
 
+    const passwordChangeAllowed =
+      request.nextUrl.pathname === "/cuenta" ||
+      request.nextUrl.pathname === "/api/account/password" ||
+      request.nextUrl.pathname === "/auth/signout";
+    if (profile.mustChangePassword && !passwordChangeAllowed) {
+      if (request.nextUrl.pathname.startsWith("/api/")) {
+        return forbiddenResponse(
+          request,
+          authResponse,
+          "Debe cambiar la contraseña temporal antes de continuar",
+        );
+      }
+
+      const accountUrl = request.nextUrl.clone();
+      accountUrl.pathname = "/cuenta";
+      accountUrl.search = "";
+      const response = NextResponse.redirect(accountUrl);
+      copyCookies(authResponse, response);
+      return applySecurityHeaders(response);
+    }
+
     if (request.nextUrl.pathname.startsWith("/api/")) {
       const permission = permissionForApiRequest(
         request.method,
@@ -272,6 +295,10 @@ export async function proxy(request: NextRequest) {
     requestHeaders.set("x-app-user-email", profile.email);
     requestHeaders.set("x-app-user-name", profile.displayName);
     requestHeaders.set("x-app-user-role", profile.role);
+    requestHeaders.set(
+      "x-app-must-change-password",
+      String(profile.mustChangePassword),
+    );
 
     const response = NextResponse.next({
       request: { headers: requestHeaders },

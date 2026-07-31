@@ -36,7 +36,10 @@ export default async function RootLayout({
   const role = requestHeaders.get("x-app-user-role");
   const displayName = requestHeaders.get("x-app-user-name");
   const email = requestHeaders.get("x-app-user-email");
-  const showProtectedShell = authMode === "basic" || Boolean(role);
+  const mustChangePassword =
+    requestHeaders.get("x-app-must-change-password") === "true";
+  const showProtectedShell =
+    authMode === "basic" || (Boolean(role) && !mustChangePassword);
 
   return (
     <html lang="es">

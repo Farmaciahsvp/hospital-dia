@@ -12,6 +12,7 @@ export const ROLE_LABELS = {
 
 const ROLE_PERMISSIONS = {
   administrator: new Set([
+    "account.password.change",
     "clinical.read",
     "clinical.write",
     "clinical.delete",
@@ -19,10 +20,12 @@ const ROLE_PERMISSIONS = {
     "users.manage",
   ]),
   pharmacist: new Set([
+    "account.password.change",
     "clinical.read",
     "clinical.write",
   ]),
   auditor: new Set([
+    "account.password.change",
     "clinical.read",
   ]),
 };
@@ -37,6 +40,13 @@ export function hasPermission(role, permission) {
 
 export function permissionForApiRequest(method, pathname) {
   const normalizedMethod = String(method).toUpperCase();
+
+  if (
+    normalizedMethod === "POST" &&
+    pathname === "/api/account/password"
+  ) {
+    return "account.password.change";
+  }
 
   if (normalizedMethod === "GET" || normalizedMethod === "HEAD") {
     return "clinical.read";

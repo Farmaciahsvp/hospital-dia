@@ -15,6 +15,7 @@ test("solo reconoce los tres roles institucionales", () => {
 });
 
 test("el auditor es estrictamente de solo lectura", () => {
+  assert.equal(hasPermission("auditor", "account.password.change"), true);
   assert.equal(hasPermission("auditor", "clinical.read"), true);
   assert.equal(hasPermission("auditor", "clinical.write"), false);
   assert.equal(hasPermission("auditor", "clinical.delete"), false);
@@ -40,6 +41,10 @@ test("el administrador conserva todas las capacidades", () => {
 });
 
 test("las APIs se clasifican con cierre seguro", () => {
+  assert.equal(
+    permissionForApiRequest("POST", "/api/account/password"),
+    "account.password.change",
+  );
   assert.equal(permissionForApiRequest("GET", "/api/items"), "clinical.read");
   assert.equal(permissionForApiRequest("POST", "/api/items"), "clinical.write");
   assert.equal(

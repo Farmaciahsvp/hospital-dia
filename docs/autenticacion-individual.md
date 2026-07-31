@@ -17,6 +17,8 @@ modo individual solo se activa de forma explícita mediante
   verificar.
 - `public.app_users` relaciona el UUID de `auth.users` con nombre, correo, rol
   y estado activo.
+- Las cuentas creadas con contraseña temporal quedan bloqueadas en la pantalla
+  de cambio de contraseña hasta que el propio usuario establezca una nueva.
 - El perfil solo puede leerse por su propio usuario mediante RLS.
 - Las tablas clínicas conservan RLS `deny-all` para `anon` y `authenticated`.
 - Los datos clínicos siguen pasando exclusivamente por las APIs del servidor
@@ -93,6 +95,7 @@ set
   "displayName" = excluded."displayName",
   role = excluded.role,
   active = excluded.active,
+  "mustChangePassword" = true,
   "updatedAt" = now();
 ```
 

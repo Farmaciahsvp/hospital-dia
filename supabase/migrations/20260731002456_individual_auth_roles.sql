@@ -12,6 +12,7 @@ create table public.app_users (
   "displayName" text not null,
   role public."AppRole" not null default 'auditor',
   active boolean not null default true,
+  "mustChangePassword" boolean not null default true,
   "lastLoginAt" timestamptz,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now(),
@@ -34,6 +35,7 @@ grant select (
   "displayName",
   role,
   active,
+  "mustChangePassword",
   "lastLoginAt"
 ) on table public.app_users to authenticated;
 
