@@ -2,12 +2,45 @@
 
 ## Estado
 
-La implementación está en la rama `codex/individual-auth` y todavía no se ha
-publicado ni aplicado a Supabase productivo.
+La implementación fue fusionada a `main` mediante el PR #3 y publicada en
+Vercel. Al 1 de agosto de 2026, producción opera en modo `individual` y conserva
+las variables de la barrera compartida de Fase 0 para reversión.
 
-Producción continúa en modo `basic`, con la barrera compartida de Fase 0. El
-modo individual solo se activa de forma explícita mediante
-`APP_AUTH_MODE=individual`.
+La migración está aplicada en Supabase productivo: `public.app_users` existe,
+tiene RLS habilitado y una política de lectura del perfil propio. La aplicación
+cuenta con dos perfiles Administrador activos. Ambos ya completaron el cambio
+de contraseña inicial.
+
+La migración fue ejecutada desde SQL Editor y no figura en el historial de
+migraciones del panel de Supabase. El archivo versionado
+`supabase/migrations/20260731002456_individual_auth_roles.sql` sigue siendo la
+fuente de verdad para reconstrucción y ambientes nuevos.
+
+### Evidencia productiva — 2026-08-01
+
+- Commit publicado: `aa10a60`.
+- Vercel reportó el deployment del commit como completado.
+- `APP_AUTH_MODE`, `APP_ACCESS_USER` y `APP_ACCESS_PASSWORD` están configuradas
+  para Production y Preview; las variables de Fase 0 se conservan para
+  reversión.
+- Comportamiento anónimo observado:
+  - `/` responde 307 hacia `/login?next=%2F`;
+  - `/login` responde 200;
+  - `/api/health` responde 401.
+- Supabase productivo `eiiybpovzyszwscqifsq` se observó Healthy.
+- Site URL: `https://hospital-dia.vercel.app`.
+- Redirect URL permitida:
+  `https://hospital-dia.vercel.app/auth/callback`.
+- Registro público, vinculación manual e inicio anónimo están deshabilitados.
+- Confirmación de correo permanece habilitada.
+- Longitud mínima de contraseña en Supabase: 14 caracteres, alineada con la
+  validación adicional de complejidad de la API.
+- La protección contra contraseñas filtradas no está disponible en el plan
+  Free; no se activó ningún costo.
+
+Para completar la verificación funcional de los tres roles todavía se requieren
+cuentas de prueba `pharmacist` y `auditor`. No debe asignarse un rol ficticio a
+personal real solo para cerrar esta comprobación.
 
 ## Arquitectura
 
