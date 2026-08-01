@@ -70,6 +70,14 @@ import {
   UserRound,
 } from "lucide-react";
 
+const STATUS_ORDER: ItemStatus[] = [
+  "pendiente",
+  "en_preparacion",
+  "listo",
+  "entregado",
+  "cancelado",
+];
+
 export function AgendaDia() {
   useRouter();
   const [fecha, setFecha] = useState(() => new Date());
@@ -168,6 +176,17 @@ export function AgendaDia() {
   const patientsOfDay = useMemo(() => {
     return buildPatientsOfDay(items);
   }, [items]);
+
+  // Con el menú cerrado no había forma de saber que la agenda estaba filtrada:
+  // el listado mostraba un subconjunto con el mismo aspecto que el día completo.
+  const activeStatuses = useMemo(
+    () => STATUS_ORDER.filter((s) => statusFilter.has(s)),
+    [statusFilter],
+  );
+  const activeStatusLabels = useMemo(
+    () => activeStatuses.map((s) => STATUS_LABEL[s]),
+    [activeStatuses],
+  );
 
   const { register, handleSubmit, setValue, reset, formState, getValues } = useForm<QuickForm>({
     resolver: zodResolver(quickSchema),
@@ -576,7 +595,7 @@ export function AgendaDia() {
                 <div className="mt-1">
                   <div className="relative inline-block">
                     <Button
-                      variant="secondary"
+                      variant={statusFilter.size ? "primary" : "secondary"}
                       type="button"
                       className="px-3 py-2"
                       onClick={(e) => {
@@ -585,8 +604,13 @@ export function AgendaDia() {
                       }}
                       aria-expanded={statusMenuOpen}
                       aria-haspopup="menu"
+                      aria-label={
+                        statusFilter.size
+                          ? `Estados: filtrando por ${activeStatusLabels.join(", ")}`
+                          : "Estados: sin filtro, mostrando todos"
+                      }
                     >
-                      ESTADOS
+                      {statusFilter.size ? `ESTADOS (${statusFilter.size})` : "ESTADOS"}
                     </Button>
                     {statusMenuOpen ? (
                       <div
@@ -595,14 +619,13 @@ export function AgendaDia() {
                         role="menu"
                       >
                         <div className="flex flex-wrap gap-2">
-                          {([
-                            "pendiente",
-                            "en_preparacion",
-                            "listo",
-                            "entregado",
-                            "cancelado",
-                          ] as ItemStatus[]).map((s) => (
-                            <Chip key={s} active={statusFilter.has(s)} onClick={() => toggleStatus(s)}>
+                          {STATUS_ORDER.map((s) => (
+                            <Chip
+                              key={s}
+                              active={statusFilter.has(s)}
+                              aria-pressed={statusFilter.has(s)}
+                              onClick={() => toggleStatus(s)}
+                            >
                               {STATUS_LABEL[s]}
                             </Chip>
                           ))}
@@ -648,7 +671,7 @@ export function AgendaDia() {
 
           <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 shadow-sm lg:sticky lg:top-20">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-zinc-900">Captura rápida</div>
+              <h2 className="text-sm font-semibold text-zinc-900">Captura rápida</h2>
               <div className="text-xs text-zinc-500">Enter: siguiente campo (en Guardar: guarda)</div>
             </div>
             <form
@@ -1068,7 +1091,7 @@ export function AgendaDia() {
         <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
           <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
             <div>
-              <div className="text-sm font-semibold text-zinc-900">PACIENTES REGISTRADOS</div>
+              <h2 className="text-sm font-semibold text-zinc-900">PACIENTES REGISTRADOS</h2>
               <div className="text-xs text-zinc-500">EDICIÓN COMPLETA (INCLUYE FECHAS DE APLICACIÓN)</div>
             </div>
             <div className="flex items-end gap-2">
@@ -1158,7 +1181,7 @@ export function AgendaDia() {
 
         <div className="relative mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
           <div className="border-b border-zinc-200 px-4 py-3">
-            <div className="text-sm font-semibold text-zinc-900">Pacientes del día</div>
+            <h2 className="text-sm font-semibold text-zinc-900">Pacientes del día</h2>
             <div className="text-xs text-zinc-500">
               Editar / eliminar / finalizar por paciente (se envía a Histórico)
             </div>
@@ -1249,12 +1272,49 @@ export function AgendaDia() {
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 print:hidden">
-            <div className="text-sm text-zinc-600">{loading ? "Cargando…" : `${items.length} registros`}</div>
-            <Button variant="secondary" onClick={() => refresh()} type="button" className="py-1.5">
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              Actualizar
-            </Button>
+            <h2 className="text-sm font-semibold text-zinc-900">Agenda del día</h2>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-zinc-600">
+                {loading ? "Cargando…" : `${items.length} registros`}
+              </span>
+              <Button variant="secondary" onClick={() => refresh()} type="button" className="py-1.5">
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Actualizar
+              </Button>
+            </div>
           </div>
+
+          {/* La vista filtrada era indistinguible del día completo. */}
+          {activeStatuses.length ? (
+            <div
+              className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 print:hidden"
+              role="status"
+            >
+              <span className="text-xs font-semibold text-amber-900">
+                Vista filtrada · no se muestran todos los registros del día
+              </span>
+              {activeStatuses.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleStatus(s)}
+                  aria-label={`Quitar el filtro ${STATUS_LABEL[s]}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                >
+                  {STATUS_LABEL[s]}
+                  <span aria-hidden="true">×</span>
+                </button>
+              ))}
+              <Button
+                variant="secondary"
+                type="button"
+                className="px-2 py-1 text-xs"
+                onClick={() => setStatusFilter(new Set())}
+              >
+                Ver todos
+              </Button>
+            </div>
+          ) : null}
 
           <div className="max-h-[62vh] overflow-auto hidden md:block">
             <table className="min-w-full text-center text-sm">

@@ -134,7 +134,7 @@ export function Estadistica() {
               <div className="lg:col-span-7">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">VOLUMEN DIARIO (RECEPCIÓN)</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">VOLUMEN DIARIO (RECEPCIÓN)</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">
@@ -174,7 +174,7 @@ export function Estadistica() {
               <div className="lg:col-span-5">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">ESTADOS</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">ESTADOS</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">
@@ -208,7 +208,7 @@ export function Estadistica() {
 
                 <div className="mt-4 rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">TIEMPOS DE ENTREGA (CREACIÓN → ENTREGA)</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">TIEMPOS DE ENTREGA (CREACIÓN → ENTREGA)</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-3 px-4 py-4 text-center text-sm text-blue-950">
                     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -240,7 +240,7 @@ export function Estadistica() {
               <div className="lg:col-span-7">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">TOP MEDICAMENTOS</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">TOP MEDICAMENTOS</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">
@@ -278,7 +278,7 @@ export function Estadistica() {
               <div className="lg:col-span-5">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">ADQUISICIÓN / FRECUENCIA</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">ADQUISICIÓN / FRECUENCIA</h2>
                   </div>
                   <div className="grid grid-cols-1 gap-4 p-4">
                     <div className="overflow-auto rounded-xl border border-zinc-200">
@@ -347,7 +347,7 @@ export function Estadistica() {
               <div className="lg:col-span-6">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">CARGA POR FARMACÉUTICO (LÍNEAS)</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">CARGA POR FARMACÉUTICO (LÍNEAS)</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">
@@ -383,7 +383,7 @@ export function Estadistica() {
               <div className="lg:col-span-6">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">CARGA POR PRESCRIPTOR (LÍNEAS)</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">CARGA POR PRESCRIPTOR (LÍNEAS)</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">
@@ -421,7 +421,7 @@ export function Estadistica() {
               <div className="lg:col-span-6">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3 text-center">
-                    <div className="text-sm font-semibold text-zinc-900">CANCELACIONES (MOTIVOS)</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">CANCELACIONES (MOTIVOS)</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">
@@ -457,7 +457,7 @@ export function Estadistica() {
               <div className="lg:col-span-6">
                 <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                   <div className="border-b border-zinc-200 px-4 py-3">
-                    <div className="text-sm font-semibold text-zinc-900">PRÓXIMOS 31 DÍAS (FECHAS DE APLICACIÓN)</div>
+                    <h2 className="text-sm font-semibold text-zinc-900">PRÓXIMOS 31 DÍAS (FECHAS DE APLICACIÓN)</h2>
                   </div>
                   <div className="overflow-auto">
                     <table className="min-w-full text-center text-sm text-blue-950">

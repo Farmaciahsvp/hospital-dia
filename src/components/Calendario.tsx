@@ -283,7 +283,7 @@ export function Calendario() {
                 <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
                   <CalendarDays className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <div className="text-sm font-semibold text-zinc-900">{monthLabel}</div>
+                <h2 className="text-sm font-semibold text-zinc-900">{monthLabel}</h2>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -375,7 +375,7 @@ export function Calendario() {
           <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="text-center">
               <div className="text-xs font-medium text-zinc-500">PLANIFICACION DE STOCK</div>
-              <div className="text-sm font-semibold text-zinc-900">MEDICAMENTOS REQUERIDOS POR RANGO</div>
+              <h2 className="text-sm font-semibold text-zinc-900">MEDICAMENTOS REQUERIDOS POR RANGO</h2>
             </div>
 
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
@@ -459,7 +459,7 @@ export function Calendario() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex-1 text-center">
                 <div className="text-xs font-medium text-zinc-500">DÍA SELECCIONADO</div>
-                <div className="text-sm font-semibold text-zinc-900">{formatDMY(selected)}</div>
+                <h2 className="text-sm font-semibold text-zinc-900">{formatDMY(selected)}</h2>
               </div>
               <div className="flex items-center gap-2">
                 <Button

@@ -136,9 +136,9 @@ export function CatalogoPersonas({
 
           <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 shadow-sm">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-zinc-900">
+              <h3 className="text-sm font-semibold text-zinc-900">
                 {editingId ? "Editar" : "Registrar / actualizar"}
-              </div>
+              </h3>
               {editingId ? (
                 <Button
                   variant="secondary"

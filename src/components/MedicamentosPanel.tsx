@@ -110,7 +110,7 @@ export function MedicamentosPanel() {
                 <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
                   <Pill className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <div className="text-sm font-semibold text-zinc-900">MEDICAMENTOS</div>
+                <h2 className="text-sm font-semibold text-zinc-900">MEDICAMENTOS</h2>
               </div>
               <Button
                 variant="secondary"
@@ -180,7 +180,7 @@ export function MedicamentosPanel() {
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-xs font-medium text-zinc-500">PACIENTES CON</div>
-                <div className="truncate text-sm font-semibold text-zinc-900">{selectedName}</div>
+                <h2 className="truncate text-sm font-semibold text-zinc-900">{selectedName}</h2>
               </div>
               <Button
                 variant="secondary"
