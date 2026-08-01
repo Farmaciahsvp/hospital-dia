@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonError, jsonFailure, jsonOk } from "@/lib/api-server";
 
 function parseIsoDate(raw: string | null) {
   if (!raw) return null;
@@ -286,8 +286,11 @@ export async function GET(request: Request) {
       })),
     });
   } catch (e) {
-    console.error({ requestId, route: "GET /api/estadistica", error: e });
-    const details = e instanceof Error ? e.message : "Error";
-    return jsonError(requestId, "No se pudo calcular la estadística. Intenta de nuevo.", { status: 500, details });
+    return jsonFailure(
+      requestId,
+      "GET /api/estadistica",
+      e,
+      "No se pudo calcular la estadística. Intente de nuevo.",
+    );
   }
 }

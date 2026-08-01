@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonFailure, jsonOk } from "@/lib/api-server";
 
 function parseMonthParam(raw: string | null) {
   if (!raw) return null;
@@ -172,16 +172,11 @@ export async function GET(request: Request) {
     const rows = effectiveTake ? sortedRows.slice(0, effectiveTake) : sortedRows;
     return jsonOk(requestId, { rows });
   } catch (e) {
-    console.error({ requestId, route: "GET /api/ultimos-registros", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    const lower = message.toLowerCase();
-    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
-      return jsonError(
-        requestId,
-        "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
-        { status: 503, details: message },
-      );
-    }
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "GET /api/ultimos-registros",
+      e,
+      "No se pudieron cargar los registros. Intente de nuevo.",
+    );
   }
 }

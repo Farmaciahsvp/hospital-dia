@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonFailure, jsonOk } from "@/lib/api-server";
 
 function parseDateParam(raw: string | null) {
   if (!raw) return null;
@@ -95,8 +95,11 @@ export async function GET(
 
     return jsonOk(requestId, { patients, total, offset, take, hasMore });
   } catch (e) {
-    console.error({ requestId, route: "GET /api/medications/[id]/patients", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "GET /api/medications/[id]/patients",
+      e,
+      "No se pudo cargar la lista de pacientes. Intente de nuevo.",
+    );
   }
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ItemStatus } from "@prisma/client";
 import { DUPLICATE_WINDOW_MS, MAX_APPLY_DATES } from "@/lib/domain-rules";
-import { getRequestId } from "@/lib/api-server";
+import { getRequestId, jsonFailure } from "@/lib/api-server";
 import { getRequestIdentity } from "@/lib/auth/request-identity";
 
 function parseDateParam(raw: string | null) {
@@ -113,35 +113,11 @@ export async function GET(request: Request) {
       serverTime: new Date().toISOString(),
     });
   } catch (e) {
-    console.error({ requestId, route: "GET /api/items", error: e });
-
-    const message = e instanceof Error ? e.message : "Error";
-    const lower = message.toLowerCase();
-    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
-      return NextResponse.json(
-        {
-          requestId,
-          error:
-            "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
-          details: message,
-        },
-        { status: 503 },
-      );
-    }
-    if (lower.includes("column") && lower.includes("does not exist")) {
-      return NextResponse.json(
-        {
-          error:
-            "La base de datos no está actualizada con el esquema esperado. Ejecuta las migraciones SQL en Supabase (`supabase-migration-003-items-frequency-acquisition.sql`, `supabase-migration-004-prep-requests-finalize.sql`, `supabase-migration-005-prep-requests-recipe-staff.sql`) y vuelve a intentar.",
-          details: message,
-        },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json(
-      { requestId, error: message },
-      { status: 500 },
+    return jsonFailure(
+      requestId,
+      "GET /api/items",
+      e,
+      "No se pudo cargar la agenda. Intente de nuevo.",
     );
   }
 }

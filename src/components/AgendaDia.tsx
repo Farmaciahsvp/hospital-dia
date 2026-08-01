@@ -32,6 +32,7 @@ import {
   buildPatientsOfDay,
   buildStatusCounts,
   formatDMY,
+  normalizeNumeroReceta,
   isoToUtcDate,
   MedicationSuggestion,
   parseDateInputToISO,
@@ -131,12 +132,6 @@ export function AgendaDia() {
     identificacion: string;
     nombre: string;
   } | null>(null);
-
-  useEffect(() => {
-    if (!editPatient?.patientId) return;
-    const el = document.getElementById(`patient-row-${editPatient.patientId}`);
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [editPatient?.patientId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -293,7 +288,7 @@ export function AgendaDia() {
       await createAgendaItems({
         fechasAplicacion,
         fechaRecepcion: values.fechaRecepcion,
-        numeroReceta: values.numeroReceta.replace(/\D/g, "").slice(0, 6),
+        numeroReceta: normalizeNumeroReceta(values.numeroReceta),
         prescriberId: values.prescriberId,
         pharmacistId: values.pharmacistId,
         patient: { identificacion: values.identificacion, nombre: values.nombre },
@@ -537,7 +532,7 @@ export function AgendaDia() {
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
-          <div className="hidden flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-600">Fecha de aplicación</label>
@@ -684,13 +679,12 @@ export function AgendaDia() {
                     quickRecetaRef.current = el;
                   }}
                   onChange={(e) => {
-                    const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
+                    const onlyDigits = normalizeNumeroReceta(e.target.value);
                     e.target.value = onlyDigits;
                     setValue("numeroReceta", onlyDigits, { shouldValidate: true });
                   }}
                   onBlur={(e) => {
-                    const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
-                    const normalized = onlyDigits ? onlyDigits.padStart(6, "0") : "";
+                    const normalized = normalizeNumeroReceta(e.target.value, { pad: true });
                     e.target.value = normalized;
                     setValue("numeroReceta", normalized, { shouldValidate: true });
                   }}
@@ -1071,47 +1065,6 @@ export function AgendaDia() {
           </div>
         </div>
 
-        {editPatient ? (
-          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/40 p-4 shadow-sm print:hidden">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-blue-950">EDITAR PACIENTE</div>
-              <Button
-                variant="secondary"
-                type="button"
-                className="py-1.5"
-                onClick={() => setEditPatient(null)}
-              >
-                CANCELAR
-              </Button>
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div>
-                <label className="block text-xs font-medium text-zinc-600">IDENTIFICACIÓN</label>
-                <Input
-                  className="mt-1"
-                  value={editPatient.identificacion}
-                  onChange={(e) =>
-                    setEditPatient((p) => (p ? { ...p, identificacion: e.target.value } : p))
-                  }
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">NOMBRE</label>
-                <Input
-                  className="mt-1"
-                  value={editPatient.nombre}
-                  onChange={(e) => setEditPatient((p) => (p ? { ...p, nombre: e.target.value } : p))}
-                />
-              </div>
-              <div className="md:col-span-3 flex items-end justify-end">
-                <Button variant="primary" type="button" onClick={() => void savePatient()}>
-                  GUARDAR CAMBIOS
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
           <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
             <div>
@@ -1203,7 +1156,7 @@ export function AgendaDia() {
           </div>
         </div>
 
-        <div className="hidden mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden relative">
+        <div className="relative mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
           <div className="border-b border-zinc-200 px-4 py-3">
             <div className="text-sm font-semibold text-zinc-900">Pacientes del día</div>
             <div className="text-xs text-zinc-500">
@@ -1294,7 +1247,7 @@ export function AgendaDia() {
           </div>
         </div>
 
-        <div className="hidden mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 print:hidden">
             <div className="text-sm text-zinc-600">{loading ? "Cargando…" : `${items.length} registros`}</div>
             <Button variant="secondary" onClick={() => refresh()} type="button" className="py-1.5">
@@ -1573,13 +1526,12 @@ export function AgendaDia() {
                 title="DEBE SER EXACTAMENTE DE 6 DIGITOS"
                 value={editUltimo.numeroReceta ?? ""}
                 onChange={(e) => {
-                  const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
+                  const onlyDigits = normalizeNumeroReceta(e.target.value);
                   e.target.value = onlyDigits;
                   setEditUltimo((p) => (p ? { ...p, numeroReceta: onlyDigits || null } : p));
                 }}
                 onBlur={(e) => {
-                  const onlyDigits = e.target.value.replace(/\\D/g, "").slice(0, 6);
-                  const normalized = onlyDigits ? onlyDigits.padStart(6, "0") : "";
+                  const normalized = normalizeNumeroReceta(e.target.value, { pad: true });
                   setEditUltimo((p) => (p ? { ...p, numeroReceta: normalized || null } : p));
                 }}
               />
