@@ -72,7 +72,9 @@ export function ErrorLogPanel() {
   if (!hasErrors && !open) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 print:hidden">
+    // A la izquierda: el toast ocupa la esquina inferior derecha y ambos
+    // compartían `bottom-4 right-4 z-50`, así que se solapaban.
+    <div className="fixed bottom-4 left-4 z-50 print:hidden">
       {!open ? (
         <button
           type="button"
