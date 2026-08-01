@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonFailure, jsonOk } from "@/lib/api-server";
 import { Prisma } from "@prisma/client";
 
 function normalizeMedicationKey(value: string) {
@@ -90,8 +90,11 @@ export async function GET(request: Request) {
 
     return jsonOk(requestId, { medications });
   } catch (e) {
-    console.error({ requestId, route: "GET /api/medicamentos-resumen", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "GET /api/medicamentos-resumen",
+      e,
+      "No se pudo cargar el resumen de medicamentos. Intente de nuevo.",
+    );
   }
 }

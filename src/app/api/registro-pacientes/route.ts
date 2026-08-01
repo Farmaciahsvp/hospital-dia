@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonFailure, jsonOk } from "@/lib/api-server";
 
 type Row = {
   patientId: string;
@@ -176,8 +176,11 @@ export async function GET(request: Request) {
 
     return jsonOk(requestId, { rows, total, offset, take, hasMore });
   } catch (e) {
-    console.error({ requestId, route: "GET /api/registro-pacientes", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "GET /api/registro-pacientes",
+      e,
+      "No se pudo cargar el registro de pacientes. Intente de nuevo.",
+    );
   }
 }

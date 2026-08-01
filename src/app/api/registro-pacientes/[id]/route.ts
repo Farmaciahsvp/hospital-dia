@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestId, jsonFailure } from "@/lib/api-server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { MAX_APPLY_DATES } from "@/lib/domain-rules";
@@ -27,6 +28,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const requestId = getRequestId(request);
   const { id } = await context.params;
   const url = new URL(request.url);
   const parsed = querySchema.safeParse({
@@ -88,8 +90,12 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "DELETE /api/registro-pacientes/[id]",
+      e,
+      "No se pudo eliminar el registro. Intente de nuevo.",
+    );
   }
 }
 
@@ -97,6 +103,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const requestId = getRequestId(request);
   const { id } = await context.params;
   const parsed = patchDatesSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -238,7 +245,11 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "PATCH /api/registro-pacientes/[id]",
+      e,
+      "No se pudo actualizar el registro. Intente de nuevo.",
+    );
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getRequestId } from "@/lib/api-server";
+import { getRequestId, jsonFailure } from "@/lib/api-server";
 
 function parseDateParam(raw: string | null) {
   if (!raw) return null;
@@ -95,19 +95,11 @@ export async function GET(request: Request) {
       rows,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error";
-    const lower = message.toLowerCase();
-    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
-      return NextResponse.json(
-        {
-          requestId,
-          error:
-            "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
-          details: message,
-        },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json({ requestId, error: message }, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "GET /api/medicamentos-rango",
+      e,
+      "No se pudo cargar el consumo por rango. Intente de nuevo.",
+    );
   }
 }

@@ -17,20 +17,29 @@ import type {
 } from "@/components/agenda/agenda-contracts";
 import { addErrorLog } from "@/lib/error-log";
 
-type ErrorPayload = { error?: string };
+type ErrorPayload = { error?: string; requestId?: string };
 
 function logAgendaApiError(message: string, details?: string) {
   if (typeof window === "undefined") return;
   addErrorLog({ source: "agenda-api", message, details });
 }
 
+/**
+ * El servidor ya redacta un mensaje apto para el usuario, así que se muestra
+ * tal cual en lugar de anteponerle el fallback: concatenarlos producía frases
+ * repetidas ("No se pudo cargar la agenda: No se pudo cargar la agenda...").
+ * El requestId se añade porque es lo que soporte necesita para rastrear el
+ * fallo en el log del servidor.
+ */
 async function readErrorMessage(
   res: Response,
   fallback: string,
 ): Promise<string> {
   try {
     const data = (await res.json()) as ErrorPayload;
-    if (data?.error) return `${fallback}: ${data.error}`;
+    if (data?.error) {
+      return data.requestId ? `${data.error} (ID: ${data.requestId})` : data.error;
+    }
   } catch {
     // ignore
   }

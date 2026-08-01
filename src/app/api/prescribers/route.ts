@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError } from "@/lib/api-server";
+import { getRequestId, jsonFailure } from "@/lib/api-server";
 
 export async function GET(request: Request) {
   const requestId = getRequestId(request);
@@ -34,17 +34,12 @@ export async function GET(request: Request) {
     res.headers.set("x-request-id", requestId);
     return res;
   } catch (e) {
-    console.error({ requestId, route: "GET /api/prescribers", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    const lower = message.toLowerCase();
-    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
-      return jsonError(
-        requestId,
-        "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
-        { status: 503, details: message },
-      );
-    }
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "GET /api/prescribers",
+      e,
+      "No se pudo cargar la lista de prescriptores. Intente de nuevo.",
+    );
   }
 }
 
@@ -70,16 +65,11 @@ export async function POST(request: Request) {
     res.headers.set("x-request-id", requestId);
     return res;
   } catch (e) {
-    console.error({ requestId, route: "POST /api/prescribers", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    const lower = message.toLowerCase();
-    if (lower.includes("maxclientsinsessionmode") || lower.includes("max clients reached")) {
-      return jsonError(
-        requestId,
-        "CONEXIONES MAXIMAS ALCANZADAS EN SUPABASE. EN VERCEL USA EL POOLER EN MODO TRANSACTION (PUERTO 6543) O AUMENTA EL POOL SIZE.",
-        { status: 503, details: message },
-      );
-    }
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "POST /api/prescribers",
+      e,
+      "No se pudo guardar el prescriptor. Intente de nuevo.",
+    );
   }
 }

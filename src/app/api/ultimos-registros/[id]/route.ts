@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestId, jsonFailure } from "@/lib/api-server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { MAX_APPLY_DATES } from "@/lib/domain-rules";
@@ -66,6 +67,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const requestId = getRequestId(request);
   // `id` is not used as identifier; client sends the itemIds to update.
   await context.params;
   const body = schema.parse(await request.json());
@@ -223,7 +225,11 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "PATCH /api/ultimos-registros/[id]",
+      e,
+      "No se pudo actualizar el registro. Intente de nuevo.",
+    );
   }
 }

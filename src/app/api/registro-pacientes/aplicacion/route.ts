@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonError, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonError, jsonFailure, jsonOk } from "@/lib/api-server";
 
 const patchSchema = z.object({
   patientId: z.string().uuid(),
@@ -45,9 +45,12 @@ export async function PATCH(request: Request) {
 
     return jsonOk(requestId, { applied });
   } catch (e) {
-    console.error({ requestId, route: "PATCH /api/registro-pacientes/aplicacion", error: e });
-    const message = e instanceof Error ? e.message : "Error";
-    return jsonError(requestId, message, { status: 500 });
+    return jsonFailure(
+      requestId,
+      "PATCH /api/registro-pacientes/aplicacion",
+      e,
+      "No se pudo actualizar la aplicación. Intente de nuevo.",
+    );
   }
 }
 

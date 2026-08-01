@@ -1,6 +1,5 @@
 export type ApiErrorPayload = {
   error?: string;
-  details?: string;
   requestId?: string;
 };
 import { addErrorLog } from "@/lib/error-log";
