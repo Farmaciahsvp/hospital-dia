@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ItemStatus } from "@prisma/client";
-import { claveIdentificacion, DUPLICATE_WINDOW_MS, MAX_APPLY_DATES } from "@/lib/domain-rules";
+import {
+  claveIdentificacion,
+  DUPLICATE_WINDOW_MS,
+  MAX_APPLY_DATES,
+  validarIdentificacion,
+  validarNombrePaciente,
+} from "@/lib/domain-rules";
 import { getRequestId, jsonFailure } from "@/lib/api-server";
 import { getRequestIdentity } from "@/lib/auth/request-identity";
 
@@ -132,9 +138,17 @@ const createItemSchema = z.object({
   numeroReceta: z.string().regex(/^\d{6}$/),
   prescriberId: z.string().uuid(),
   pharmacistId: z.string().uuid(),
+  // La validación se repite en el servidor a propósito: la del formulario es
+  // para guiar, esta es la que de verdad impide que entre basura.
   patient: z.object({
-    identificacion: z.string().trim().min(1),
-    nombre: z.string().trim().min(1),
+    identificacion: z.string().trim().superRefine((v, ctx) => {
+      const r = validarIdentificacion(v);
+      if (!r.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.motivo });
+    }),
+    nombre: z.string().trim().superRefine((v, ctx) => {
+      const r = validarNombrePaciente(v);
+      if (!r.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.motivo });
+    }),
   }),
   medication: z.object({
     id: z.string().uuid(),
