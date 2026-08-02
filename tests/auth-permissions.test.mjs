@@ -64,3 +64,16 @@ test("las APIs se clasifican con cierre seguro", () => {
     "users.manage",
   );
 });
+
+test("eliminar una ficha de paciente queda reservado al administrador", () => {
+  // El endpoint es nuevo y borra datos de paciente: conviene fijar por prueba
+  // que cae bajo `clinical.delete` y no bajo el `clinical.write` que tiene el
+  // farmacéutico, para que un cambio en el enrutado no lo abra por descuido.
+  assert.equal(
+    permissionForApiRequest("DELETE", "/api/patients/abc"),
+    "clinical.delete",
+  );
+  assert.equal(hasPermission("administrator", "clinical.delete"), true);
+  assert.equal(hasPermission("pharmacist", "clinical.delete"), false);
+  assert.equal(hasPermission("auditor", "clinical.delete"), false);
+});

@@ -159,7 +159,31 @@ Consecuencia: una cédula tecleada mal crea una ficha permanente que nadie puede
 
 Verificado: tras eliminar el registro de prueba, `/api/patients?query=0-0000` y `?query=PRUEBA` siguen devolviendo la ficha, mientras `/api/items` del día ya está vacío.
 
-**Arreglo:** `DELETE /api/patients/[id]` restringido a administrador y solo cuando la ficha no tenga solicitudes asociadas; o una fusión de fichas duplicadas, que es el caso real más frecuente.
+**Tamaño real del problema** (consulta sobre producción, 2 de agosto de 2026):
+
+| | |
+|---|---|
+| Fichas totales | 197 |
+| **Sin ningún registro asociado** | **13 (6,6 %)** |
+| Cédulas normalizadas distintas | 196 → hay un duplicado |
+| Longitud de cédula atípica (fuera de 9-12 dígitos) | 8 |
+
+Las 13 huérfanas se concentran entre diciembre de 2025 y febrero de 2026 —los primeros meses de uso— más una de julio de 2026. Tres tienen una cédula que es subcadena de la de un paciente activo (dígitos de más o de menos al teclear) y una comparte nombre exacto con un paciente activo: residuo de erratas, tal como se preveía.
+
+**Arreglo aplicado:** `DELETE /api/patients/[id]`, restringido a administrador por el proxy (`clinical.delete`) y con rechazo `409` si la ficha tiene solicitudes. La interfaz vive en Catálogo → "Fichas de paciente", con filtro "Solo sin registros".
+
+---
+
+### 26. El mismo paciente puede existir dos veces con historial en ambas fichas
+🟠 **Alto.** Descubierto al cuantificar el 25.
+
+`POST /api/items` resuelve el paciente con `upsert where: { identificacion }` sobre el texto tal cual se escribió. Como la cédula se guarda con el formato que teclee cada quien, **el mismo número con y sin separadores crea dos fichas distintas**.
+
+Encontrado en producción: un paciente con los mismos 11 dígitos existe dos veces, una ficha con separadores (creada en enero, 2 solicitudes) y otra sin ellos (creada en mayo, 9 solicitudes). Su historial está partido: ninguna de las dos vistas lo muestra completo, y el consolidado por medicamento lo cuenta como dos personas.
+
+Esto no lo resuelve el borrado del hallazgo 25: ambas fichas tienen registros, y eliminar cualquiera perdería datos clínicos.
+
+**Arreglo:** normalizar la cédula al guardar (guardar solo dígitos, o un formato canónico) para que no se creen nuevas, más una fusión de fichas que reasigne las solicitudes a una y retire la otra. Requiere migración de los datos ya existentes.
 
 ---
 

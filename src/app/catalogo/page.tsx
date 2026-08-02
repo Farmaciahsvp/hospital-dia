@@ -1,4 +1,5 @@
 import { CatalogoMedicamentos } from "@/components/CatalogoMedicamentos";
+import { CatalogoPacientes } from "@/components/CatalogoPacientes";
 import { NavPills } from "@/components/NavPills";
 import { Archive, BookOpen, Stethoscope, UserRound } from "lucide-react";
 
@@ -24,6 +25,11 @@ export default function CatalogoPage() {
         </div>
       </header>
       <CatalogoMedicamentos />
+      {/* Va aquí, dentro de Catálogo, para no añadir otra entrada de navegación
+          mientras la duplicación sidebar/píldoras sigue sin decidirse. */}
+      <div className="mx-auto w-full max-w-7xl px-4 pb-6">
+        <CatalogoPacientes />
+      </div>
     </>
   );
 }
