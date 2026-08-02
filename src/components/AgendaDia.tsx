@@ -274,6 +274,7 @@ export function AgendaDia() {
   /** Rótulos de los campos obligatorios que faltaron en el último envío. */
   const [missingFields, setMissingFields] = useState<string[]>([]);
 
+  const statusTriggerRef = useRef<HTMLButtonElement | null>(null);
   const quickIdentRef = useRef<HTMLInputElement | null>(null);
   const quickRecetaRef = useRef<HTMLInputElement | null>(null);
   const quickFormRef = useRef<HTMLFormElement | null>(null);
@@ -492,6 +493,25 @@ export function AgendaDia() {
     });
   }, []);
 
+  const clearStatusFilter = useCallback(() => {
+    setStatusFilter(new Set());
+    setStatusMenuOpen(false);
+    statusTriggerRef.current?.focus();
+  }, []);
+
+  // El popover se cerraba solo con un clic fuera: `Escape` lo dejaba abierto
+  // aunque el foco estuviera de vuelta en el disparador.
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setStatusMenuOpen(false);
+      statusTriggerRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [statusMenuOpen]);
+
   const savePatient = useCallback(async () => {
     if (!editPatient) return;
     try {
@@ -600,7 +620,7 @@ export function AgendaDia() {
     <div className="min-h-screen bg-transparent text-zinc-900">
       <Toast toast={toast} onClear={() => setToast(null)} />
 
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur print:hidden">
+      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white print:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
             <div className="text-sm font-medium text-zinc-500">Hospital de Heredia</div>
@@ -672,10 +692,13 @@ export function AgendaDia() {
                 )}
               </Field>
               <div>
-                <label className="block text-xs font-medium text-zinc-600">Estados</label>
+                <label className="block text-xs font-medium text-zinc-600" id="filtro-estados-rotulo">
+                  Estados
+                </label>
                 <div className="mt-1">
                   <div className="relative inline-block">
                     <Button
+                      ref={statusTriggerRef}
                       variant={statusFilter.size ? "primary" : "secondary"}
                       type="button"
                       className="px-3 py-2"
@@ -684,7 +707,7 @@ export function AgendaDia() {
                         setStatusMenuOpen((v) => !v);
                       }}
                       aria-expanded={statusMenuOpen}
-                      aria-haspopup="menu"
+                      aria-haspopup="true"
                       aria-label={
                         statusFilter.size
                           ? `Estados: filtrando por ${activeStatusLabels.join(", ")}`
@@ -695,9 +718,19 @@ export function AgendaDia() {
                     </Button>
                     {statusMenuOpen ? (
                       <div
-                        className="absolute left-0 top-11 z-20 w-72 rounded-2xl border border-zinc-200 bg-white p-3 shadow-lg"
+                        // Se abría hacia abajo tapando "Número de receta" e
+                        // "Identificación", los dos primeros campos de captura.
+                        // `right-0 bottom-full` lo saca de encima del formulario.
+                        className="absolute bottom-full right-0 z-30 mb-2 w-72 rounded-2xl border border-zinc-200 bg-white p-3 shadow-lg"
                         onClick={(e) => e.stopPropagation()}
-                        role="menu"
+                        onKeyDown={(e) => {
+                          if (e.key !== "Escape") return;
+                          e.stopPropagation();
+                          setStatusMenuOpen(false);
+                          statusTriggerRef.current?.focus();
+                        }}
+                        role="group"
+                        aria-labelledby="filtro-estados-rotulo"
                       >
                         <div className="flex flex-wrap gap-2">
                           {STATUS_ORDER.map((s) => (
@@ -711,6 +744,15 @@ export function AgendaDia() {
                             </Chip>
                           ))}
                         </div>
+                        {statusFilter.size ? (
+                          <button
+                            type="button"
+                            className="mt-3 w-full rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                            onClick={clearStatusFilter}
+                          >
+                            Quitar filtro y ver todos
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -1675,7 +1717,11 @@ export function AgendaDia() {
             </div>
           </div>
 
-          <AgendaSummaryFooter counts={counts} lastUpdated={lastUpdated} />
+          <AgendaSummaryFooter
+            counts={counts}
+            lastUpdated={lastUpdated}
+            filtrado={statusFilter.size > 0}
+          />
         </div>
       </div>
 

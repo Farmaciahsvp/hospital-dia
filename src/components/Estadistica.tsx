@@ -98,8 +98,15 @@ export function Estadistica() {
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 ACTUALIZAR
               </Button>
+              {/* El identificador de petición es para soporte, no para quien
+                  consulta la estadística: iba impreso junto al botón en la vista
+                  principal. Se conserva accesible al inspeccionar, sin ocupar
+                  sitio ni competir con los datos. */}
               {data?.requestId ? (
-                <div className="text-xs text-zinc-500">REQUEST ID: {data.requestId}</div>
+                <details className="text-xs text-zinc-400">
+                  <summary className="cursor-pointer">Soporte</summary>
+                  <span className="select-all">ID de petición: {data.requestId}</span>
+                </details>
               ) : null}
             </div>
           </div>

@@ -1,14 +1,14 @@
 "use client";
 
+import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "subtle" | "danger";
 
-export function Button({
-  variant = "secondary",
-  className,
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }
+>(function Button({ variant = "secondary", className, ...props }, ref) {
   const base =
     "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50";
   const styles: Record<ButtonVariant, string> = {
@@ -21,5 +21,5 @@ export function Button({
     danger:
       "bg-rose-600 text-white shadow-sm hover:bg-rose-500 hover:shadow focus-visible:outline-rose-600",
   };
-  return <button className={cn(base, styles[variant], className)} {...props} />;
-}
+  return <button ref={ref} className={cn(base, styles[variant], className)} {...props} />;
+});
