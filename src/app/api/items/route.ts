@@ -165,7 +165,22 @@ const createItemSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const body = createItemSchema.parse(await request.json());
+  // `parse` lanzaba y nadie recogía la excepción, así que un cuerpo inválido
+  // salía como 500 con cuerpo vacío: el cliente no podía decir qué estaba mal.
+  // Un dato que no cumple las reglas es culpa de la petición, no del servidor.
+  const parsed = createItemSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const campo = issue?.path.join(".") ?? "";
+    return NextResponse.json(
+      {
+        error: issue?.message ?? "Datos inválidos",
+        campo: campo || undefined,
+      },
+      { status: 400 },
+    );
+  }
+  const body = parsed.data;
   const actor = getRequestIdentity(request)?.auditLabel ?? body.createdBy ?? null;
   const rawDates = body.fechasAplicacion?.length
     ? body.fechasAplicacion
