@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { MAX_APPLY_DATES } from "@/lib/domain-rules";
+import {
+  MAX_APPLY_DATES,
+  validarIdentificacion,
+  validarNombrePaciente,
+} from "@/lib/domain-rules";
 import type { ExportRow } from "@/lib/export";
 import type { ItemStatus } from "@/lib/status";
 import * as domain from "./agenda-domain.mjs";
@@ -73,8 +77,17 @@ export const quickSchema = z.object({
   pharmacistTexto: z.string().trim().min(1, "Requerido"),
   pharmacistId: z.string().uuid({ message: "Seleccione un farmacéutico de la lista" }),
   claveAutorizacion: z.string().trim().max(100, "Máximo 100 caracteres").optional(),
-  identificacion: z.string().trim().min(1, "Requerido"),
-  nombre: z.string().trim().min(1, "Requerido"),
+  // El motivo concreto lo da el validador compartido, así que se propaga tal
+  // cual en vez de un "Requerido" genérico: distinguir "faltan dígitos" de
+  // "parece un código de medicamento" es justo lo que evita el error.
+  identificacion: z.string().trim().superRefine((v, ctx) => {
+    const r = validarIdentificacion(v);
+    if (!r.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.motivo });
+  }),
+  nombre: z.string().trim().superRefine((v, ctx) => {
+    const r = validarNombrePaciente(v);
+    if (!r.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.motivo });
+  }),
   medicamentoId: z.string().uuid({ message: "Seleccione un medicamento de la lista" }),
   // Sin mensaje propio, Zod devuelve su texto por defecto en inglés ("String
   // must contain at least 1 character(s)"). Antes casi no se veía porque el

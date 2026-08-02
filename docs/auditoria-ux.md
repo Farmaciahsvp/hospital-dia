@@ -221,6 +221,30 @@ Que el grupo 1 coincida en las 16 fechas sugiere además que no son dos episodio
 
 ---
 
+### 27. Identificación y Nombre aceptaban cualquier cosa
+🟠 **Alto.** Descubierto al revisar el grupo 1 del hallazgo 26.
+
+Ambos campos eran `z.string().trim().min(1)`: sin formato, sin longitud, sin restricción de caracteres. Lo que llegó a producción:
+
+| Campo | Valor guardado | Solicitudes |
+|---|---|---|
+| Identificación | `1-10-41-4653 7 2690099149` | 16 |
+| Nombre | `ALICIA HERNANDEZ GONZALEZ 7 2690099149` | 16 + 16 |
+| Nombre | `DAMARIS MAYELA CHAC0N GUERRERO` | 14 |
+
+`1-10-41-4653` es el código institucional de TRASTUZUMAB dentro del campo de cédula. Y `CHAC0N` lleva un cero en lugar de la O, catorce solicitudes sin que nadie lo detectara.
+
+**Reglas aplicadas**, fijadas contra las 197 fichas reales para no bloquear nada legítimo:
+
+- **Identificación:** solo dígitos y los separadores `-`, `/`, `.` y espacio; entre 8 y 12 dígitos; rechazo explícito de la forma `d-dd-dd-dddd`, que es la de un código de medicamento y encajaría en el rango de dígitos de una cédula.
+- **Nombre:** sin cifras, mínimo 3 caracteres.
+
+Se validan en el formulario y de nuevo en `/api/items`: la primera guía, la segunda es la que impide que entre.
+
+**Efecto sobre datos ya existentes:** de 197 fichas, las reglas solo rechazan las 3 anteriores, todas erróneas. Ninguna ficha legítima queda bloqueada. Como contrapartida, registrar de nuevo a esos 3 pacientes exigirá corregir el dato en el momento; en el caso del nombre eso se arregla en el propio formulario y la corrección se guarda.
+
+---
+
 ### 20. Botón etiquetado "Esc"
 `src/components/agenda/AgendaItemActions.tsx:63` — durante la edición en línea, el botón de cancelar se llama "Esc". Es el nombre de una tecla, no una acción. Debería decir "Cancelar" (y mencionar el atajo aparte).
 
