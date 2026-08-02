@@ -127,12 +127,12 @@ export function Historico() {
           <table className="min-w-full text-center text-sm">
             <thead className="bg-white">
               <tr className="border-b border-zinc-200 text-xs font-semibold text-zinc-600">
-                <th className="px-3 py-2 text-center">FECHA</th>
-                <th className="px-3 py-2 text-center">IDENTIFICACIÓN</th>
-                <th className="px-3 py-2 text-center">NOMBRE</th>
-                <th className="px-3 py-2 text-center">LÍNEAS</th>
-                <th className="px-3 py-2 text-center">FINALIZADO</th>
-                <th className="px-3 py-2 text-center">ACCIONES</th>
+                <th scope="col" className="px-3 py-2 text-center">FECHA</th>
+                <th scope="col" className="px-3 py-2 text-center">IDENTIFICACIÓN</th>
+                <th scope="col" className="px-3 py-2 text-center">NOMBRE</th>
+                <th scope="col" className="px-3 py-2 text-center">LÍNEAS</th>
+                <th scope="col" className="px-3 py-2 text-center">FINALIZADO</th>
+                <th scope="col" className="px-3 py-2 text-center">ACCIONES</th>
               </tr>
             </thead>
             <tbody>
@@ -200,10 +200,10 @@ export function Historico() {
             <table className="min-w-full text-center text-sm">
               <thead className="bg-white">
                 <tr className="border-b border-zinc-200 text-xs font-semibold text-zinc-600">
-                  <th className="px-3 py-2 text-center">ESTADO</th>
-                  <th className="px-3 py-2 text-center">MEDICAMENTO</th>
-                  <th className="px-3 py-2 text-center">DOSIS</th>
-                  <th className="px-3 py-2 text-center">UNIDADES</th>
+                  <th scope="col" className="px-3 py-2 text-center">ESTADO</th>
+                  <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
+                  <th scope="col" className="px-3 py-2 text-center">DOSIS</th>
+                  <th scope="col" className="px-3 py-2 text-center">UNIDADES</th>
                 </tr>
               </thead>
               <tbody>

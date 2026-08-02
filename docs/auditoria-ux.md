@@ -106,7 +106,11 @@ No hay ni una ocurrencia en `src/`. El estado activo es solo visual (fondo azul)
 ### 13. Todos los campos fuerzan mayúsculas por CSS
 `src/components/ui/Input.tsx:15` — clase `uppercase`. Verificado: 18 de 19 campos.
 
-El texto se **ve** en mayúsculas pero se guarda tal cual se escribió, así que lo mostrado y lo almacenado divergen. Las mayúsculas continuas también se leen más despacio y eliminan la señal de nombres propios. Si el objetivo es normalizar, hacerlo en el dato (al guardar), no en la vista.
+**Corrección posterior:** este hallazgo estaba en su mayor parte equivocado. `/api/items` sí normaliza a mayúsculas al guardar (paciente, dosis, frecuencia; y `/api/medications` para el catálogo), así que lo mostrado y lo almacenado coinciden. Las mayúsculas son una convención institucional deliberada, no un defecto.
+
+Lo que sí divergía es **Observaciones**, el único campo que el servidor deja tal cual (`body.observaciones ?? null`, `src/app/api/items/route.ts:197`) mientras la vista lo mostraba en mayúsculas. Además es prosa, donde la caja normal se lee mejor.
+
+De paso apareció que la regla global de `globals.css` era código muerto para estos campos: selecciona `input[type="text"]` y `ui/Input` no declara `type`, así que nunca los alcanzaba — las mayúsculas venían solo de la clase del componente.
 
 ### 14. Tablas sin semántica de encabezado
 Los `<th>` no llevan `scope="row"`/`scope="col"` y ninguna tabla tiene `<caption>` (los títulos "Agenda del día", "Pacientes del día" viven fuera de la tabla). Con 8 columnas, un lector de pantalla no puede relacionar celda y columna.

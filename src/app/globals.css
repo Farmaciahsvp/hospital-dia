@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Alto de la cabecera fija de página. Lo usa el encabezado de la agenda para
+     quedarse justo debajo al desplazarse, en vez de encerrar la tabla en su
+     propio scroll dentro de una página que ya se desplaza. */
+  --altura-cabecera: 73px;
 }
 
 @theme inline {
@@ -27,7 +31,10 @@ body {
   background-color: #eef6ff;
 }
 
-/* Entrada en mayúsculas (UI) */
+/* Entrada en mayúsculas para `<textarea>` y para cualquier `<input>` suelto que
+   sí declare su `type`. El componente `ui/Input` no pasa por aquí: no escribe
+   `type="text"`, así que estos selectores nunca lo alcanzaban; lo resuelve con
+   su prop `caja`, que además permite exceptuar Observaciones. */
 input[type="text"],
 input[type="search"],
 input[type="tel"],

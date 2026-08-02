@@ -2,10 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type ToastState = { kind: "success" | "error"; message: string } | null;
+export type ToastState = {
+  kind: "success" | "error";
+  message: string;
+  /** Acción de reparación ofrecida junto al aviso, p. ej. deshacer un cambio de
+   *  estado aplicado por error. Solo tiene sentido mientras el aviso está. */
+  action?: { label: string; onAction: () => void | Promise<void> };
+} | null;
 
 /** Los aciertos se van solos; los errores no (ver comentario en el efecto). */
 const SUCCESS_MS = 4000;
+/** Con acción de deshacer el aviso dura más: es la única ventana para reparar
+ *  un cambio de estado aplicado por error, y cuatro segundos no bastan para
+ *  leerlo, decidir y llegar al botón. */
+const SUCCESS_CON_ACCION_MS = 9000;
 
 export function Toast({
   toast,
@@ -36,7 +46,10 @@ export function Toast({
     // fallo en el log del servidor. Descartarlo solo lo hacía ilegible antes de
     // poder copiarlo, así que ahora espera a que el usuario lo cierre.
     if (!toast || isError || paused) return;
-    const t = setTimeout(() => onClearRef.current(), SUCCESS_MS);
+    const t = setTimeout(
+      () => onClearRef.current(),
+      toast.action ? SUCCESS_CON_ACCION_MS : SUCCESS_MS,
+    );
     return () => clearTimeout(t);
   }, [toast, isError, paused]);
 
@@ -52,6 +65,19 @@ export function Toast({
       onBlurCapture={() => setPaused(false)}
     >
       <span className="min-w-0 flex-1 break-words">{toast.message}</span>
+
+      {toast.action ? (
+        <button
+          type="button"
+          className="shrink-0 rounded border border-white/60 px-2 py-0.5 text-xs font-semibold hover:bg-white/20 focus-visible:outline-white"
+          onClick={() => {
+            void toast.action?.onAction();
+            onClearRef.current();
+          }}
+        >
+          {toast.action.label}
+        </button>
+      ) : null}
 
       {isError ? (
         <button

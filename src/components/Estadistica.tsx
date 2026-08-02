@@ -147,10 +147,10 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">FECHA</th>
-                          <th className="px-3 py-2 text-center">RECETAS</th>
-                          <th className="px-3 py-2 text-center">PACIENTES</th>
-                          <th className="px-3 py-2 text-center">LÍNEAS</th>
+                          <th scope="col" className="px-3 py-2 text-center">FECHA</th>
+                          <th scope="col" className="px-3 py-2 text-center">RECETAS</th>
+                          <th scope="col" className="px-3 py-2 text-center">PACIENTES</th>
+                          <th scope="col" className="px-3 py-2 text-center">LÍNEAS</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -187,8 +187,8 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">ESTADO</th>
-                          <th className="px-3 py-2 text-center">CANTIDAD</th>
+                          <th scope="col" className="px-3 py-2 text-center">ESTADO</th>
+                          <th scope="col" className="px-3 py-2 text-center">CANTIDAD</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -253,9 +253,9 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">MEDICAMENTO</th>
-                          <th className="px-3 py-2 text-center">LÍNEAS</th>
-                          <th className="px-3 py-2 text-center">UNIDADES</th>
+                          <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
+                          <th scope="col" className="px-3 py-2 text-center">LÍNEAS</th>
+                          <th scope="col" className="px-3 py-2 text-center">UNIDADES</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -292,8 +292,8 @@ export function Estadistica() {
                       <table className="min-w-full text-center text-sm text-blue-950">
                         <thead className="bg-white">
                           <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                            <th className="px-3 py-2 text-center">ADQUISICIÓN</th>
-                            <th className="px-3 py-2 text-center">CANTIDAD</th>
+                            <th scope="col" className="px-3 py-2 text-center">ADQUISICIÓN</th>
+                            <th scope="col" className="px-3 py-2 text-center">CANTIDAD</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -321,8 +321,8 @@ export function Estadistica() {
                       <table className="min-w-full text-center text-sm text-blue-950">
                         <thead className="bg-white">
                           <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                            <th className="px-3 py-2 text-center">FRECUENCIA</th>
-                            <th className="px-3 py-2 text-center">CANTIDAD</th>
+                            <th scope="col" className="px-3 py-2 text-center">FRECUENCIA</th>
+                            <th scope="col" className="px-3 py-2 text-center">CANTIDAD</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -360,8 +360,8 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">FARMACÉUTICO</th>
-                          <th className="px-3 py-2 text-center">LÍNEAS</th>
+                          <th scope="col" className="px-3 py-2 text-center">FARMACÉUTICO</th>
+                          <th scope="col" className="px-3 py-2 text-center">LÍNEAS</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -396,8 +396,8 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">PRESCRIPTOR</th>
-                          <th className="px-3 py-2 text-center">LÍNEAS</th>
+                          <th scope="col" className="px-3 py-2 text-center">PRESCRIPTOR</th>
+                          <th scope="col" className="px-3 py-2 text-center">LÍNEAS</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -434,8 +434,8 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">MOTIVO</th>
-                          <th className="px-3 py-2 text-center">CANTIDAD</th>
+                          <th scope="col" className="px-3 py-2 text-center">MOTIVO</th>
+                          <th scope="col" className="px-3 py-2 text-center">CANTIDAD</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -470,9 +470,9 @@ export function Estadistica() {
                     <table className="min-w-full text-center text-sm text-blue-950">
                       <thead className="bg-white">
                         <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                          <th className="px-3 py-2 text-center">FECHA</th>
-                          <th className="px-3 py-2 text-center">PACIENTES</th>
-                          <th className="px-3 py-2 text-center">LÍNEAS</th>
+                          <th scope="col" className="px-3 py-2 text-center">FECHA</th>
+                          <th scope="col" className="px-3 py-2 text-center">PACIENTES</th>
+                          <th scope="col" className="px-3 py-2 text-center">LÍNEAS</th>
                         </tr>
                       </thead>
                       <tbody>

@@ -186,15 +186,15 @@ export function RegistroPacientes() {
           <table className="min-w-full text-center text-sm text-blue-950">
             <thead className="bg-white">
               <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                <th className="px-3 py-2 text-center">FECHA DE RECEPCIÓN</th>
-                <th className="px-3 py-2 text-center">NÚMERO DE RECETA</th>
-                <th className="px-3 py-2 text-center">CÉDULA</th>
-                <th className="px-3 py-2 text-center">NOMBRE</th>
-                <th className="px-3 py-2 text-center">MEDICAMENTO</th>
-                <th className="px-3 py-2 text-center">DOSIS</th>
-                <th className="px-3 py-2 text-center">FECHAS DE APLICACIÓN</th>
-                <th className="px-3 py-2 text-center">FARMACÉUTICO</th>
-                <th className="px-3 py-2 text-center">ACCIONES</th>
+                <th scope="col" className="px-3 py-2 text-center">FECHA DE RECEPCIÓN</th>
+                <th scope="col" className="px-3 py-2 text-center">NÚMERO DE RECETA</th>
+                <th scope="col" className="px-3 py-2 text-center">CÉDULA</th>
+                <th scope="col" className="px-3 py-2 text-center">NOMBRE</th>
+                <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
+                <th scope="col" className="px-3 py-2 text-center">DOSIS</th>
+                <th scope="col" className="px-3 py-2 text-center">FECHAS DE APLICACIÓN</th>
+                <th scope="col" className="px-3 py-2 text-center">FARMACÉUTICO</th>
+                <th scope="col" className="px-3 py-2 text-center">ACCIONES</th>
               </tr>
             </thead>
             <tbody>

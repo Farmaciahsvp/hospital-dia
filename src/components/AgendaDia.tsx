@@ -570,6 +570,44 @@ export function AgendaDia() {
     [refresh],
   );
 
+  // "Listo" y "Entregado" se aplicaban al instante, sin confirmación ni vuelta
+  // atrás, desde botones contiguos de una fila entre once. Marcar "Entregado" al
+  // paciente equivocado no tenía reparación; ahora el aviso ofrece deshacer.
+  const changeStatus = useCallback(
+    async (item: AgendaItem, next: ItemStatus) => {
+      const previo = item.estado;
+      const quien = item.nombre ?? item.identificacion;
+      await patchAgendaItem(item.id, {
+        estado: next,
+        updatedBy: "farmacia",
+        entregadoAt: next === "entregado" ? new Date().toISOString() : undefined,
+      });
+      setToast({
+        kind: "success",
+        message: `${quien}: ${STATUS_LABEL[next]}`,
+        action:
+          previo === next
+            ? undefined
+            : {
+              label: "Deshacer",
+              onAction: async () => {
+                await patchAgendaItem(item.id, {
+                  estado: previo,
+                  updatedBy: "farmacia",
+                  // Volver atrás desde "entregado" tiene que borrar la marca de
+                  // entrega, o el registro queda diciendo que se entregó.
+                  entregadoAt: previo === "entregado" ? undefined : null,
+                });
+                setToast({ kind: "success", message: `${quien}: ${STATUS_LABEL[previo]}` });
+                await refresh();
+              },
+            },
+      });
+      await refresh();
+    },
+    [refresh],
+  );
+
   const duplicateItem = useCallback(
     async (id: string) => {
       await duplicateAgendaItem(id, { createdBy: "farmacia" });
@@ -1124,7 +1162,16 @@ export function AgendaDia() {
                 error={formState.errors.observaciones?.message}
               >
                 {(f) => (
-                  <Input {...f} {...register("observaciones")} className="mt-1" placeholder="Texto corto" />
+                  // Único campo que el servidor no pasa a mayúsculas al guardar
+                  // (`body.observaciones ?? null` en /api/items): forzarlas solo
+                  // en pantalla hacía que lo mostrado no fuese lo almacenado.
+                  <Input
+                    {...f}
+                    {...register("observaciones")}
+                    caja="normal"
+                    className="mt-1"
+                    placeholder="Texto corto"
+                  />
                 )}
               </Field>
               {/* Varias entradas bajo un mismo rótulo: `fieldset`/`legend` es lo
@@ -1335,15 +1382,20 @@ export function AgendaDia() {
           </div>
           <div className="overflow-auto">
             <table className="min-w-full text-center text-sm text-blue-950">
+              {/* El título vivía fuera de la tabla, así que la tabla en sí no
+                  tenía nombre al navegarla con lector de pantalla. */}
+              <caption className="sr-only">
+                Pacientes registrados del mes, con edición completa
+              </caption>
               <thead className="bg-white">
                 <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                  <th className="px-3 py-2 text-center">FECHA</th>
-                  <th className="px-3 py-2 text-center">CÉDULA</th>
-                  <th className="px-3 py-2 text-center">NOMBRE DEL PACIENTE</th>
-                  <th className="px-3 py-2 text-center">MEDICAMENTO</th>
-                  <th className="px-3 py-2 text-center">DOSIS</th>
-                  <th className="px-3 py-2 text-center">FRECUENCIA</th>
-                  <th className="px-3 py-2 text-center">ACCIONES</th>
+                  <th scope="col" className="px-3 py-2 text-center">FECHA</th>
+                  <th scope="col" className="px-3 py-2 text-center">CÉDULA</th>
+                  <th scope="col" className="px-3 py-2 text-center">NOMBRE DEL PACIENTE</th>
+                  <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
+                  <th scope="col" className="px-3 py-2 text-center">DOSIS</th>
+                  <th scope="col" className="px-3 py-2 text-center">FRECUENCIA</th>
+                  <th scope="col" className="px-3 py-2 text-center">ACCIONES</th>
                 </tr>
               </thead>
               <tbody>
@@ -1406,12 +1458,13 @@ export function AgendaDia() {
           </div>
           <div className="overflow-auto">
             <table className="min-w-full text-center text-sm">
+              <caption className="sr-only">Pacientes con registros en la fecha seleccionada</caption>
               <thead className="bg-white">
                 <tr className="border-b border-zinc-200 text-xs font-semibold text-zinc-600">
-                  <th className="px-3 py-2 text-center">Identificación</th>
-                  <th className="px-3 py-2 text-center">Nombre</th>
-                  <th className="px-3 py-2 text-center">Líneas</th>
-                  <th className="px-3 py-2 text-center">Acciones</th>
+                  <th scope="col" className="px-3 py-2 text-center">Identificación</th>
+                  <th scope="col" className="px-3 py-2 text-center">Nombre</th>
+                  <th scope="col" className="px-3 py-2 text-center">Líneas</th>
+                  <th scope="col" className="px-3 py-2 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -1534,18 +1587,23 @@ export function AgendaDia() {
             </div>
           ) : null}
 
-          <div className="max-h-[62vh] overflow-auto hidden md:block">
+          {/* Tenía `max-h-[62vh] overflow-auto`: la tabla se desplazaba dentro
+              de una página que también se desplaza, se veían 6 de 11 filas y
+              aparecían filas cortadas por la mitad. Ahora crece y el encabezado
+              se queda pegado justo bajo la cabecera de página. */}
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-full text-center text-sm">
-              <thead className="sticky top-0 bg-white">
+              <caption className="sr-only">Agenda del día seleccionado</caption>
+              <thead className="sticky top-[var(--altura-cabecera)] z-10 bg-white shadow-[0_1px_0_0_rgb(228_228_231)]">
                 <tr className="border-b border-zinc-200 text-xs font-semibold text-zinc-600">
-                  <th className="px-3 py-2 text-center">Estado</th>
-                  <th className="px-3 py-2 text-center">Identificación</th>
-                  <th className="px-3 py-2 text-center">Nombre</th>
-                  <th className="px-3 py-2 text-center">Medicamento</th>
-                  <th className="px-3 py-2 text-center">Dosis</th>
-                  <th className="px-3 py-2 text-center">Unidades</th>
-                  <th className="px-3 py-2 text-center">Obs.</th>
-                  <th className="px-3 py-2 text-center print:hidden">Acciones</th>
+                  <th scope="col" className="px-3 py-2 text-center">Estado</th>
+                  <th scope="col" className="px-3 py-2 text-center">Identificación</th>
+                  <th scope="col" className="px-3 py-2 text-center">Nombre</th>
+                  <th scope="col" className="px-3 py-2 text-center">Medicamento</th>
+                  <th scope="col" className="px-3 py-2 text-center">Dosis</th>
+                  <th scope="col" className="px-3 py-2 text-center">Unidades</th>
+                  <th scope="col" className="px-3 py-2 text-center">Obs.</th>
+                  <th scope="col" className="px-3 py-2 text-center print:hidden">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -1565,7 +1623,7 @@ export function AgendaDia() {
                       value={i.estado}
                       editable
                       describedItem={i.nombre ?? i.identificacion}
-                      onChange={(v) => void updateItem(i.id, { estado: v })}
+                      onChange={(v) => void changeStatus(i, v)}
                     />
                     </td>
                     <td className="px-3 py-2 text-center font-medium whitespace-nowrap">{i.identificacion}</td>
@@ -1636,8 +1694,8 @@ export function AgendaDia() {
                         isEditing={editId === i.id}
                         menuOpen={menuId === i.id}
                         onSetMenuOpen={(open) => setMenuId(open ? i.id : null)}
-                        onMarkListo={() => void updateItem(i.id, { estado: "listo" })}
-                        onMarkEntregado={() => void updateItem(i.id, { estado: "entregado" })}
+                        onMarkListo={() => void changeStatus(i, "listo")}
+                        onMarkEntregado={() => void changeStatus(i, "entregado")}
                         onStartEdit={() => startEdit(i)}
                         onSaveEdit={() => void saveEdit()}
                         onCancelEdit={cancelEdit}
@@ -1679,7 +1737,7 @@ export function AgendaDia() {
                       value={i.estado}
                       editable
                       describedItem={i.nombre ?? i.identificacion}
-                      onChange={(v) => void updateItem(i.id, { estado: v })}
+                      onChange={(v) => void changeStatus(i, v)}
                     />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -1698,8 +1756,8 @@ export function AgendaDia() {
                   </div>
                   <AgendaMobileActions
                     hasObservaciones={!!i.observaciones}
-                    onMarkListo={() => void updateItem(i.id, { estado: "listo" })}
-                    onMarkEntregado={() => void updateItem(i.id, { estado: "entregado" })}
+                    onMarkListo={() => void changeStatus(i, "listo")}
+                    onMarkEntregado={() => void changeStatus(i, "entregado")}
                     onOpenObs={() => setObsItem(i)}
                     onDuplicate={() => void duplicateItem(i.id)}
                     onOpenCancel={() => {
