@@ -5,18 +5,26 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = (url.searchParams.get("query") ?? "").trim();
+  // El autocompletado de la captura usa este mismo endpoint y no quiere ni el
+  // recuento ni las fichas sin historial, así que ambos van tras un parámetro.
+  const conRecuento = url.searchParams.get("conRecuento") === "true";
+  const soloSinRegistros = url.searchParams.get("soloSinRegistros") === "true";
 
   const patients = await prisma.patient.findMany({
-    where: query
-      ? {
-          OR: [
-            { identificacion: { contains: query, mode: "insensitive" } },
-            { nombre: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
+    where: {
+      ...(query
+        ? {
+            OR: [
+              { identificacion: { contains: query, mode: "insensitive" } },
+              { nombre: { contains: query, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(soloSinRegistros ? { requests: { none: {} } } : {}),
+    },
     orderBy: { updatedAt: "desc" },
-    take: 20,
+    take: soloSinRegistros || conRecuento ? 100 : 20,
+    ...(conRecuento ? { include: { _count: { select: { requests: true } } } } : {}),
   });
 
   return NextResponse.json(
@@ -24,6 +32,9 @@ export async function GET(request: Request) {
       id: p.id,
       identificacion: p.identificacion,
       nombre: p.nombre,
+      ...(conRecuento
+        ? { solicitudes: (p as typeof p & { _count: { requests: number } })._count.requests }
+        : {}),
     })),
   );
 }
