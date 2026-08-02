@@ -72,17 +72,31 @@ export const quickSchema = z.object({
   prescriberId: z.string().uuid({ message: "Seleccione un prescriptor de la lista" }),
   pharmacistTexto: z.string().trim().min(1, "Requerido"),
   pharmacistId: z.string().uuid({ message: "Seleccione un farmacéutico de la lista" }),
-  claveAutorizacion: z.string().trim().max(100).optional(),
+  claveAutorizacion: z.string().trim().max(100, "Máximo 100 caracteres").optional(),
   identificacion: z.string().trim().min(1, "Requerido"),
   nombre: z.string().trim().min(1, "Requerido"),
   medicamentoId: z.string().uuid({ message: "Seleccione un medicamento de la lista" }),
-  medicamentoTexto: z.string().trim().min(1),
-  dosisTexto: z.string().trim().min(1),
-  unidadesRequeridas: z.preprocess((v) => Number(v), z.number().positive()),
-  totalCiclos: z.preprocess((v) => Number(v), z.number().int().positive().max(MAX_APPLY_DATES)),
-  frecuencia: z.string().trim().min(1, "Requerido").max(50),
+  // Sin mensaje propio, Zod devuelve su texto por defecto en inglés ("String
+  // must contain at least 1 character(s)"). Antes casi no se veía porque el
+  // botón estaba deshabilitado; ahora que el envío inválido muestra los errores,
+  // asomaba en una interfaz que por lo demás está en español.
+  medicamentoTexto: z.string().trim().min(1, "Requerido"),
+  dosisTexto: z.string().trim().min(1, "Requerido"),
+  unidadesRequeridas: z.preprocess(
+    (v) => Number(v),
+    z.number({ message: "Requerido" }).positive("Debe ser mayor que 0"),
+  ),
+  totalCiclos: z.preprocess(
+    (v) => Number(v),
+    z
+      .number({ message: "Requerido" })
+      .int("Debe ser un número entero")
+      .positive("Debe ser mayor que 0")
+      .max(MAX_APPLY_DATES, `Máximo ${MAX_APPLY_DATES}`),
+  ),
+  frecuencia: z.string().trim().min(1, "Requerido").max(50, "Máximo 50 caracteres"),
   adquisicion: z.enum(["almacenable", "compra_local"]),
-  observaciones: z.string().trim().max(300).optional(),
+  observaciones: z.string().trim().max(300, "Máximo 300 caracteres").optional(),
   recursoAmparo: z.boolean().optional(),
 });
 
