@@ -33,7 +33,10 @@ export type PatchAgendaItemRequest = Partial<
 > & {
   canceladoMotivo?: string | null;
   updatedBy?: string;
-  entregadoAt?: string;
+  /** `null` borra la marca de entrega, que es lo que hace falta al deshacer un
+   *  "Entregado". El esquema del PATCH ya lo aceptaba (`.nullable()`); el tipo
+   *  del cliente se había quedado corto. */
+  entregadoAt?: string | null;
 };
 
 export type PatchUltimoRegistroRequest = {

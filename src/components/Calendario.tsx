@@ -425,9 +425,9 @@ export function Calendario() {
               <table className="min-w-full text-center text-sm text-blue-950">
                 <thead className="bg-white">
                   <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                    <th className="px-3 py-2 text-center">MEDICAMENTO</th>
-                    <th className="px-3 py-2 text-center">LINEAS</th>
-                    <th className="px-3 py-2 text-center">UNIDADES</th>
+                    <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
+                    <th scope="col" className="px-3 py-2 text-center">LINEAS</th>
+                    <th scope="col" className="px-3 py-2 text-center">UNIDADES</th>
                   </tr>
                 </thead>
                 <tbody>

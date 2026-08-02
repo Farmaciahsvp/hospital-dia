@@ -46,7 +46,17 @@ export default async function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {showProtectedShell ? (
           <div className="min-h-screen bg-sky-50 text-zinc-900">
-            <div className="flex min-h-screen">
+            {/* Sin esto había que tabular por toda la barra lateral y la
+                cabecera antes de llegar a la tabla del día. */}
+            <a
+              href="#contenido"
+              className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-blue-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+            >
+              Saltar al contenido
+            </a>
+            {/* En columna por debajo de `md` para que la barra de menú móvil
+                ocupe el ancho completo en vez de competir con el contenido. */}
+            <div className="flex min-h-screen flex-col md:flex-row">
               <Sidebar
                 authMode={authMode}
                 user={
@@ -55,7 +65,9 @@ export default async function RootLayout({
                     : null
                 }
               />
-              <main className="min-w-0 flex-1">{children}</main>
+              <main id="contenido" className="min-w-0 flex-1">
+                {children}
+              </main>
             </div>
             <ErrorLogPanel />
           </div>

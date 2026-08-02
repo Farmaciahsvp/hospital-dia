@@ -5,7 +5,7 @@ import { Archive, BookOpen, Stethoscope, UserRound } from "lucide-react";
 export default function HistoricoPage() {
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
             <div className="text-sm font-medium text-zinc-500">HOSPITAL DE HEREDIA</div>

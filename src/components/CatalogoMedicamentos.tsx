@@ -239,11 +239,11 @@ export function CatalogoMedicamentos() {
             <table className="min-w-full text-center text-sm">
               <thead className="bg-white">
                 <tr className="border-b border-zinc-200 text-xs font-semibold text-zinc-600">
-                  <th className="px-3 py-2 text-center">Código</th>
-                  <th className="px-3 py-2 text-center">Nombre</th>
-                  <th className="px-3 py-2 text-center">Concentración</th>
-                  <th className="px-3 py-2 text-center">Vía</th>
-                  <th className="px-3 py-2 text-center">Acciones</th>
+                  <th scope="col" className="px-3 py-2 text-center">Código</th>
+                  <th scope="col" className="px-3 py-2 text-center">Nombre</th>
+                  <th scope="col" className="px-3 py-2 text-center">Concentración</th>
+                  <th scope="col" className="px-3 py-2 text-center">Vía</th>
+                  <th scope="col" className="px-3 py-2 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody>
