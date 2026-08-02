@@ -89,7 +89,11 @@ Sobre el azul `blue-950` de la barra lateral el contraste del contorno queda ~1.
 ### 10. Los modales no atrapan el foco y se cierran al arrastrar
 `src/components/Modal.tsx:56-60`
 
-`role="dialog"` + `aria-modal="true"` pero sin foco inicial, sin *focus trap*, sin devolver el foco al cerrar y sin `inert` en el fondo: con Tab se sale del diálogo al contenido de detrás. Además el cierre está en `onMouseDown` del *overlay*, así que un arrastre que termine fuera cierra el diálogo. Se usa para "Cancelar registro" y "Eliminar paciente del día", donde perder lo escrito duele.
+`role="dialog"` + `aria-modal="true"` pero sin foco inicial, sin *focus trap*, sin devolver el foco al cerrar y sin `inert` en el fondo.
+
+**Comprobado en producción con datos (2 de agosto de 2026):** con "Cancelar registro" abierto y un motivo escrito, el foco no está dentro del diálogo, hay 58 elementos enfocables detrás, y **cuatro tabulaciones llevan el foco al enlace "AGENDA" de la barra lateral**, tras el overlay.
+
+**Corrección:** la descripción del cierre por arrastre estaba invertida. Arrastrar *desde dentro y soltar fuera* **no** cierra —el panel detiene la propagación del `mousedown`—. Lo que sí cierra, y descarta lo escrito, es arrastrar **desde fuera hacia dentro**: el `mousedown` cae en el contenedor y dispara el cierre antes de que exista un clic. Reproducido en producción: el motivo "PRUEBA QA" se perdió.
 
 ---
 
@@ -145,6 +149,19 @@ Al desplazarse, los botones rojos de eliminar y las píldoras de estado se trans
 ---
 
 ## 🔵 Bajos
+
+### 25. No hay forma de eliminar una ficha de paciente
+🟠 **Alto.** Descubierto al limpiar la prueba del 2 de agosto de 2026.
+
+"Eliminar paciente del día" borra la solicitud del día y sus líneas, pero deja intacta la fila de `Patient`. Y `/api/patients/[id]` solo expone `GET` y `PATCH`: no existe `DELETE`, ni por interfaz ni por API.
+
+Consecuencia: una cédula tecleada mal crea una ficha permanente que nadie puede retirar y que seguirá apareciendo en el autocompletado de Identificación y de Nombre para siempre, compitiendo con la ficha correcta en el momento de la captura. En un flujo donde el nombre se autorrellena a partir de la cédula, eso es una vía directa a asociar una preparación a un paciente equivocado.
+
+Verificado: tras eliminar el registro de prueba, `/api/patients?query=0-0000` y `?query=PRUEBA` siguen devolviendo la ficha, mientras `/api/items` del día ya está vacío.
+
+**Arreglo:** `DELETE /api/patients/[id]` restringido a administrador y solo cuando la ficha no tenga solicitudes asociadas; o una fusión de fichas duplicadas, que es el caso real más frecuente.
+
+---
 
 ### 20. Botón etiquetado "Esc"
 `src/components/agenda/AgendaItemActions.tsx:63` — durante la edición en línea, el botón de cancelar se llama "Esc". Es el nombre de una tecla, no una acción. Debería decir "Cancelar" (y mencionar el atajo aparte).
