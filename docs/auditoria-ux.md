@@ -183,7 +183,41 @@ Encontrado en producción: un paciente con los mismos 11 dígitos existe dos vec
 
 Esto no lo resuelve el borrado del hallazgo 25: ambas fichas tienen registros, y eliminar cualquiera perdería datos clínicos.
 
-**Arreglo:** normalizar la cédula al guardar (guardar solo dígitos, o un formato canónico) para que no se creen nuevas, más una fusión de fichas que reasigne las solicitudes a una y retire la otra. Requiere migración de los datos ya existentes.
+**Ampliación tras medirlo (2 de agosto de 2026).** El problema es bastante mayor de lo que sugería ese caso aislado. Agrupando por nombre normalizado:
+
+| | |
+|---|---|
+| Grupos de fichas con nombre idéntico | 5 |
+| Fichas implicadas | 11 |
+| **Grupos con historial partido** (≥2 fichas con solicitudes) | **5 de 5** |
+| **Solicitudes repartidas en esos grupos** | **70** |
+
+Los cinco grupos, con las cédulas enmascaradas:
+
+| Grupo | Fichas | Reparto de solicitudes | Patrón |
+|---|---|---|---|
+| 1 | 20 dígitos vs 11 dígitos | **16 y 16** | La larga contiene a la corta: pegado doble |
+| 2 | 11 y 11 dígitos | 9 y 2 | Misma cifra, una con separadores |
+| 3 | 9 y 10 dígitos | 7 y 1 | Cero inicial de más |
+| 4 | 9 (`717…`) y 8 dígitos (`170…`) | **9 y 8** | Dígito desplazado o perdido |
+| 5 | 10, 10 y 9 dígitos | 1, 1 y 0 | Tres fichas; una con cifra no emparentada |
+
+Los grupos 1 y 4 son los serios: dos fichas casi igual de activas para lo que parece la misma persona, con la historia de tratamiento partida por la mitad. Ninguna vista muestra el historial completo, y el consolidado por medicamento cuenta a esa persona dos veces.
+
+**Normalizar la cédula NO resuelve esto.** De los cinco grupos, solo el 2 lo detectaría una regla de dígitos. Los grupos 1, 4 y parte del 5 son erratas de tecleo, y distinguir "la misma persona escrita mal" de "dos personas que se llaman igual" exige a alguien con acceso al expediente. La normalización previene casos nuevos; no repara los existentes.
+
+**Arreglo, en tres partes:**
+1. **Prevención:** buscar la ficha existente comparando la cédula normalizada, no la cadena literal, para que no se sigan creando divisiones nuevas.
+2. **Detección:** mostrar los posibles duplicados, hoy invisibles en la aplicación.
+3. **Fusión:** que un administrador pueda reasignar las solicitudes de una ficha a otra y retirar la sobrante, **siempre con revisión humana**. No debe automatizarse.
+
+Los cinco grupos existentes requieren decisión clínica caso por caso; no son un `UPDATE` masivo.
+
+**Trampa para quien implemente la fusión.** `PrepRequest` es único por `(fechaAplicacion, patientId)` (`prisma/schema.prisma:116`). En el grupo 1 hay **16 fechas en las que ambas fichas tienen solicitud el mismo día**, y en el grupo 2 hay una. Reasignar el `patientId` de golpe viola esa restricción en todas ellas. La fusión tiene que trabajar a nivel de líneas: cuando las dos fichas coinciden en fecha, mover los `PrepRequestItem` a la solicitud que sobrevive y eliminar la vacía, en lugar de reasignar la solicitud entera.
+
+Que el grupo 1 coincida en las 16 fechas sugiere además que no son dos episodios distintos, sino la misma visita registrada dos veces cada día.
+
+**Estado:** aplicada la parte 1 (prevención). Las partes 2 y 3 siguen pendientes, igual que las cinco decisiones clínicas.
 
 ---
 

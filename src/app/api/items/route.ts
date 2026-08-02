@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ItemStatus } from "@prisma/client";
-import { DUPLICATE_WINDOW_MS, MAX_APPLY_DATES } from "@/lib/domain-rules";
+import { claveIdentificacion, DUPLICATE_WINDOW_MS, MAX_APPLY_DATES } from "@/lib/domain-rules";
 import { getRequestId, jsonFailure } from "@/lib/api-server";
 import { getRequestIdentity } from "@/lib/auth/request-identity";
 
@@ -180,14 +180,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Fecha de recepción inválida" }, { status: 400 });
   }
 
-  const patient = await prisma.patient.upsert({
-    where: { identificacion: body.patient.identificacion.toUpperCase() },
-    update: { nombre: body.patient.nombre.toUpperCase() },
-    create: {
-      identificacion: body.patient.identificacion.toUpperCase(),
-      nombre: body.patient.nombre.toUpperCase(),
-    },
-  });
+  const identificacion = body.patient.identificacion.toUpperCase();
+  const nombrePaciente = body.patient.nombre.toUpperCase();
+
+  // El upsert buscaba por la cadena literal, así que "1-1234-5678", "112345678"
+  // y "0112345678" creaban tres fichas del mismo paciente y le partían el
+  // historial. Se busca por la clave normalizada y se reutiliza la ficha que ya
+  // exista; solo se crea cuando de verdad no hay ninguna.
+  const clave = claveIdentificacion(identificacion);
+  // Con clave vacía no se busca nada: tratarla como comodín haría que una
+  // entrada sin dígitos reutilizara una ficha ajena.
+  //
+  // Cuando ya hay varias fichas de la misma persona —las cinco divisiones que
+  // arrastra la base—, se elige la que más solicitudes acumula, no la más
+  // antigua: así lo nuevo se concentra en la ficha dominante, que es la que una
+  // fusión conservaría, en vez de seguir engordando la otra mitad.
+  const existente = clave
+    ? (
+        await prisma.$queryRaw<Array<{ id: string }>>`
+          select p.id
+          from patients p
+          left join prep_requests r on r."patientId" = p.id
+          where regexp_replace(regexp_replace(p.identificacion, '[^0-9]', '', 'g'), '^0+', '') = ${clave}
+          group by p.id, p."createdAt"
+          order by count(r.id) desc, p."createdAt" asc
+          limit 1
+        `
+      )[0]
+    : undefined;
+
+  const patient = existente
+    ? await prisma.patient.update({
+        where: { id: existente.id },
+        // La identificación no se reescribe: se respeta como quedó registrada.
+        data: { nombre: nombrePaciente },
+      })
+    : await prisma.patient.create({
+        data: { identificacion, nombre: nombrePaciente },
+      });
 
   const medicationId = body.medication.id;
 
