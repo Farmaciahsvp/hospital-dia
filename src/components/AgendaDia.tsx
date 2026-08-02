@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toISODateString } from "@/lib/date";
 import { MAX_APPLY_DATES } from "@/lib/domain-rules";
@@ -53,6 +53,7 @@ import { Toast, type ToastState } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { NavPills } from "@/components/NavPills";
@@ -77,6 +78,60 @@ const STATUS_ORDER: ItemStatus[] = [
   "entregado",
   "cancelado",
 ];
+
+/** Rótulo visible de cada campo de Captura rápida. Es la misma cadena que ve el
+ *  usuario en la etiqueta y la que se nombra al listar lo que falta, para que
+ *  el aviso y el formulario hablen igual. */
+const FIELD_LABELS: Record<keyof QuickForm, string> = {
+  fechaRecepcion: "Fecha de recepción",
+  numeroReceta: "Número de receta (6 dígitos)",
+  identificacion: "Identificación",
+  nombre: "Nombre del paciente",
+  medicamentoTexto: "Medicamento",
+  medicamentoId: "Medicamento",
+  dosisTexto: "Dosis",
+  frecuencia: "Frecuencia",
+  unidadesRequeridas: "Unidades",
+  totalCiclos: "Total de Ciclos",
+  prescriberTexto: "Prescriptor",
+  prescriberId: "Prescriptor",
+  claveAutorizacion: "Clave de Autorización",
+  adquisicion: "Adquisición",
+  observaciones: "Observaciones",
+  pharmacistTexto: "Farmacéutico",
+  pharmacistId: "Farmacéutico",
+  recursoAmparo: "Recurso de amparo",
+};
+
+/** Orden de lectura del formulario: fija en qué orden se nombran los campos que
+ *  faltan y cuál recibe el foco. */
+const QUICK_FIELD_ORDER: (keyof QuickForm)[] = [
+  "fechaRecepcion",
+  "numeroReceta",
+  "identificacion",
+  "nombre",
+  "medicamentoTexto",
+  "medicamentoId",
+  "dosisTexto",
+  "frecuencia",
+  "unidadesRequeridas",
+  "totalCiclos",
+  "prescriberTexto",
+  "prescriberId",
+  "claveAutorizacion",
+  "adquisicion",
+  "observaciones",
+  "pharmacistTexto",
+  "pharmacistId",
+];
+
+/** Los campos de persona validan sobre el `*Id` oculto pero el usuario escribe
+ *  en el `*Texto`: el foco debe ir al campo visible. */
+const FOCUS_TARGET: Partial<Record<keyof QuickForm, keyof QuickForm>> = {
+  prescriberId: "prescriberTexto",
+  pharmacistId: "pharmacistTexto",
+  medicamentoId: "medicamentoTexto",
+};
 
 export function AgendaDia() {
   useRouter();
@@ -188,7 +243,7 @@ export function AgendaDia() {
     [activeStatuses],
   );
 
-  const { register, handleSubmit, setValue, reset, formState, getValues } = useForm<QuickForm>({
+  const { register, handleSubmit, setValue, setFocus, reset, formState, getValues } = useForm<QuickForm>({
     resolver: zodResolver(quickSchema),
     mode: "onBlur",
     reValidateMode: "onChange",
@@ -215,6 +270,9 @@ export function AgendaDia() {
   });
 
   const totalCiclosField = register("totalCiclos");
+
+  /** Rótulos de los campos obligatorios que faltaron en el último envío. */
+  const [missingFields, setMissingFields] = useState<string[]>([]);
 
   const quickIdentRef = useRef<HTMLInputElement | null>(null);
   const quickRecetaRef = useRef<HTMLInputElement | null>(null);
@@ -298,7 +356,24 @@ export function AgendaDia() {
     void loadUltimos();
   }, [loadUltimos]);
 
+  // Un envío inválido tiene que decir qué falta y llevar allí el foco: antes el
+  // botón quedaba deshabilitado y no había forma de saber qué campo lo bloqueaba.
+  const onQuickInvalid = useCallback(
+    (errors: FieldErrors<QuickForm>) => {
+      const names = QUICK_FIELD_ORDER.filter((name) => errors[name]);
+      const labels = names
+        .map((name) => FIELD_LABELS[FOCUS_TARGET[name] ?? name])
+        .filter((label, idx, all) => all.indexOf(label) === idx);
+      setMissingFields(labels);
+
+      const first = names[0];
+      if (first) setFocus(FOCUS_TARGET[first] ?? first, { shouldSelect: true });
+    },
+    [setFocus],
+  );
+
   const onQuickSubmit = handleSubmit(async (values) => {
+    setMissingFields([]);
     if (quickSubmitInFlightRef.current) return;
     quickSubmitInFlightRef.current = true;
     try {
@@ -367,7 +442,7 @@ export function AgendaDia() {
     } finally {
       quickSubmitInFlightRef.current = false;
     }
-  });
+  }, onQuickInvalid);
 
   const suggestApplyDates = useCallback(() => {
     const step = parseFrequencyStep(getValues("frecuencia"));
@@ -553,43 +628,49 @@ export function AgendaDia() {
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm print:hidden">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-              <div>
-                <label className="block text-xs font-medium text-zinc-600">Fecha de aplicación</label>
-                <Input
-                  type="date"
-                  className="mt-1"
-                  value={fechaInput}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setFechaInput(raw);
-                    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
-                    const next = new Date(`${raw}T00:00:00`);
-                    if (Number.isNaN(next.getTime())) return;
-                    setFecha(next);
-                  }}
-                  onBlur={() => {
-                    setFechaInput(fechaStr);
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-600">Buscar paciente</label>
-                <Input
-                  className="mt-1"
-                  placeholder="cédula / expediente / nombre"
-                  value={searchPatient}
-                  onChange={(e) => setSearchPatient(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-600">Buscar medicamento</label>
-                <Input
-                  className="mt-1"
-                  placeholder="nombre / código"
-                  value={searchMedication}
-                  onChange={(e) => setSearchMedication(e.target.value)}
-                />
-              </div>
+              <Field label="Fecha de aplicación">
+                {(f) => (
+                  <Input
+                    {...f}
+                    type="date"
+                    className="mt-1"
+                    value={fechaInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFechaInput(raw);
+                      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
+                      const next = new Date(`${raw}T00:00:00`);
+                      if (Number.isNaN(next.getTime())) return;
+                      setFecha(next);
+                    }}
+                    onBlur={() => {
+                      setFechaInput(fechaStr);
+                    }}
+                  />
+                )}
+              </Field>
+              <Field label="Buscar paciente">
+                {(f) => (
+                  <Input
+                    {...f}
+                    className="mt-1"
+                    placeholder="cédula / expediente / nombre"
+                    value={searchPatient}
+                    onChange={(e) => setSearchPatient(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label="Buscar medicamento">
+                {(f) => (
+                  <Input
+                    {...f}
+                    className="mt-1"
+                    placeholder="nombre / código"
+                    value={searchMedication}
+                    onChange={(e) => setSearchMedication(e.target.value)}
+                  />
+                )}
+              </Field>
               <div>
                 <label className="block text-xs font-medium text-zinc-600">Estados</label>
                 <div className="mt-1">
@@ -679,89 +760,117 @@ export function AgendaDia() {
               className="grid grid-cols-1 gap-3 md:grid-cols-7"
               onSubmit={onQuickSubmit}
               onKeyDownCapture={onQuickKeyDownCapture}
+              // `required` se mantiene en cada campo porque es lo que anuncia la
+              // obligatoriedad a un lector de pantalla, pero la burbuja nativa
+              // corta el envío antes de React y se comía el resumen de lo que
+              // falta. `noValidate` desactiva solo esa interfaz del navegador.
+              noValidate
             >
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Fecha de recepción *</label>
-                <Input className="mt-1" type="date" {...register("fechaRecepcion")} />
-                {formState.errors.fechaRecepcion ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.fechaRecepcion.message}</div>
-                ) : null}
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Número de receta (6 dígitos) *</label>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.fechaRecepcion}
+                required
+                error={formState.errors.fechaRecepcion?.message}
+              >
+                {(f) => <Input className="mt-1" type="date" {...f} {...register("fechaRecepcion")} />}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.numeroReceta}
+                required
+                error={formState.errors.numeroReceta?.message}
+              >
+                {(f) => (
+                  <Input
+                    className="mt-1"
+                    inputMode="numeric"
+                    maxLength={6}
+                    pattern="[0-9]{6}"
+                    title="Debe ser exactamente de 6 dígitos"
+                    placeholder="000000"
+                    {...f}
+                    {...register("numeroReceta")}
+                    ref={(el) => {
+                      register("numeroReceta").ref(el);
+                      quickRecetaRef.current = el;
+                    }}
+                    onChange={(e) => {
+                      const onlyDigits = normalizeNumeroReceta(e.target.value);
+                      e.target.value = onlyDigits;
+                      setValue("numeroReceta", onlyDigits, { shouldValidate: true });
+                    }}
+                    onBlur={(e) => {
+                      const normalized = normalizeNumeroReceta(e.target.value, { pad: true });
+                      e.target.value = normalized;
+                      setValue("numeroReceta", normalized, { shouldValidate: true });
+                    }}
+                  />
+                )}
+              </Field>
+              <Field
+                className="md:col-span-1"
+                label={FIELD_LABELS.identificacion}
+                required
+                error={formState.errors.identificacion?.message}
+              >
+                {(f) => (
+                  <>
+                    <Input
+                      {...f}
+                      {...register("identificacion")}
+                      ref={(el) => {
+                        register("identificacion").ref(el);
+                        quickIdentRef.current = el;
+                      }}
+                      list="patient-suggestions"
+                      className="mt-1"
+                      placeholder="Ej: 1-1234-5678"
+                      onChange={(e) => {
+                        setValue("identificacion", e.target.value, { shouldValidate: true });
+                        void loadPatientSuggestions(e.target.value);
+                      }}
+                      onBlur={() => {
+                        const val = (document.querySelector('input[name="identificacion"]') as HTMLInputElement | null)?.value;
+                        const match = patientSuggestions.find((p) => p.identificacion === val);
+                        if (match?.nombre) setValue("nombre", match.nombre ?? "", { shouldValidate: true });
+                      }}
+                    />
+                    <datalist id="patient-suggestions">
+                      {patientSuggestions.map((p) => (
+                        <option key={p.id} value={p.identificacion}>
+                          {p.nombre ?? ""}
+                        </option>
+                      ))}
+                    </datalist>
+                  </>
+                )}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.nombre}
+                required
+                error={formState.errors.nombre?.message}
+              >
+                {(f) => (
+                  <Input
+                    {...f}
+                    {...register("nombre")}
+                    className="mt-1"
+                    placeholder="Autorrelleno si existe"
+                  />
+                )}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.medicamentoTexto}
+                required
+                error={
+                  formState.errors.medicamentoId?.message ?? formState.errors.medicamentoTexto?.message
+                }
+              >
+                {(f) => (
                 <Input
-                  className="mt-1"
-                  inputMode="numeric"
-                  maxLength={6}
-                  pattern="[0-9]{6}"
-                  title="DEBE SER EXACTAMENTE DE 6 DIGITOS"
-                  placeholder="000000"
-                  {...register("numeroReceta")}
-                  ref={(el) => {
-                    register("numeroReceta").ref(el);
-                    quickRecetaRef.current = el;
-                  }}
-                  onChange={(e) => {
-                    const onlyDigits = normalizeNumeroReceta(e.target.value);
-                    e.target.value = onlyDigits;
-                    setValue("numeroReceta", onlyDigits, { shouldValidate: true });
-                  }}
-                  onBlur={(e) => {
-                    const normalized = normalizeNumeroReceta(e.target.value, { pad: true });
-                    e.target.value = normalized;
-                    setValue("numeroReceta", normalized, { shouldValidate: true });
-                  }}
-                />
-                {formState.errors.numeroReceta ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.numeroReceta.message}</div>
-                ) : null}
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Identificación *</label>
-                <Input
-                  {...register("identificacion")}
-                  ref={(el) => {
-                    register("identificacion").ref(el);
-                    quickIdentRef.current = el;
-                  }}
-                  list="patient-suggestions"
-                  className="mt-1"
-                  placeholder="Ej: 1-1234-5678"
-                  onChange={(e) => {
-                    setValue("identificacion", e.target.value, { shouldValidate: true });
-                    void loadPatientSuggestions(e.target.value);
-                  }}
-                  onBlur={() => {
-                    const val = (document.querySelector('input[name="identificacion"]') as HTMLInputElement | null)?.value;
-                    const match = patientSuggestions.find((p) => p.identificacion === val);
-                    if (match?.nombre) setValue("nombre", match.nombre ?? "", { shouldValidate: true });
-                  }}
-                />
-                {formState.errors.identificacion ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.identificacion.message}</div>
-                ) : null}
-                <datalist id="patient-suggestions">
-                  {patientSuggestions.map((p) => (
-                    <option key={p.id} value={p.identificacion}>
-                      {p.nombre ?? ""}
-                    </option>
-                  ))}
-                </datalist>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Nombre del paciente *</label>
-                <Input
-                  {...register("nombre")}
-                  className="mt-1"
-                  placeholder="Autorrelleno si existe"
-                />
-                {formState.errors.nombre ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.nombre.message}</div>
-                ) : null}
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Medicamento *</label>
-                <Input
+                  {...f}
                   {...register("medicamentoTexto")}
                   list="med-suggestions"
                   className="mt-1"
@@ -791,53 +900,64 @@ export function AgendaDia() {
                     }
                   }}
                 />
-                {formState.errors.medicamentoId ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.medicamentoId.message}</div>
-                ) : formState.errors.medicamentoTexto ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.medicamentoTexto.message}</div>
-                ) : null}
-                <datalist id="med-suggestions">
-                  {medSuggestions.map((m) => (
-                    <option key={m.id} value={m.label} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Dosis *</label>
+                )}
+              </Field>
+              <datalist id="med-suggestions">
+                {medSuggestions.map((m) => (
+                  <option key={m.id} value={m.label} />
+                ))}
+              </datalist>
+              <Field
+                className="md:col-span-1"
+                label={FIELD_LABELS.dosisTexto}
+                required
+                error={formState.errors.dosisTexto?.message}
+              >
+                {(f) => (
+                  <Input {...f} {...register("dosisTexto")} className="mt-1" placeholder="Ej: 500 mg" />
+                )}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.frecuencia}
+                required
+                error={formState.errors.frecuencia?.message}
+              >
+                {(f) => (
+                  <Input
+                    {...f}
+                    {...register("frecuencia")}
+                    className="mt-1"
+                    placeholder="Ej: CADA 8H / SEMANAL"
+                  />
+                )}
+              </Field>
+              <Field
+                className="md:col-span-1"
+                label={FIELD_LABELS.unidadesRequeridas}
+                required
+                error={formState.errors.unidadesRequeridas?.message}
+              >
+                {(f) => (
+                  <Input
+                    {...f}
+                    {...register("unidadesRequeridas")}
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="mt-1"
+                  />
+                )}
+              </Field>
+              <Field
+                className="md:col-span-1"
+                label={FIELD_LABELS.totalCiclos}
+                required
+                error={formState.errors.totalCiclos?.message}
+              >
+                {(f) => (
                 <Input
-                  {...register("dosisTexto")}
-                  className="mt-1"
-                  placeholder="Ej: 500 mg"
-                />
-                {formState.errors.dosisTexto ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.dosisTexto.message}</div>
-                ) : null}
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Frecuencia *</label>
-                <Input
-                  {...register("frecuencia")}
-                  className="mt-1"
-                  placeholder="Ej: CADA 8H / SEMANAL"
-                />
-                {formState.errors.frecuencia ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.frecuencia.message}</div>
-                ) : null}
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Unidades *</label>
-                <Input
-                  {...register("unidadesRequeridas")}
-                  type="number"
-                  min={1}
-                  step={1}
-                  required
-                  className="mt-1"
-                />
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-zinc-600">Total de Ciclos *</label>
-                <Input
+                  {...f}
                   {...totalCiclosField}
                   type="number"
                   min={1}
@@ -875,81 +995,109 @@ export function AgendaDia() {
                     if (Number.isFinite(nextCount)) setValue("totalCiclos", nextCount, { shouldValidate: true });
                   }}
                 />
-              </div>
-              <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">Prescriptor *</label>
-                <Input
-                  className="mt-1"
-                  list="prescriber-suggestions"
-                  placeholder="ESCRIBA PARA BUSCAR"
-                  {...register("prescriberTexto")}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setValue("prescriberTexto", val, { shouldValidate: true });
-                    const match = prescribers.find((p) => personLabel(p) === val);
-                    setValue("prescriberId", match?.id ?? "", { shouldValidate: true });
-                  }}
-                  onBlur={() => {
-                    const val =
-                      (document.querySelector('input[name="prescriberTexto"]') as HTMLInputElement | null)?.value ??
-                      "";
-                    const match = prescribers.find((p) => personLabel(p) === val);
-                    setValue("prescriberId", match?.id ?? "", { shouldValidate: true });
-                  }}
-                />
-                {formState.errors.prescriberId ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.prescriberId.message}</div>
-                ) : formState.errors.prescriberTexto ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.prescriberTexto.message}</div>
-                ) : null}
-                <datalist id="prescriber-suggestions">
-                  {prescribers.map((p) => (
-                    <option key={p.id} value={personLabel(p)} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Clave de Autorización</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    {...register("claveAutorizacion")}
-                    className="mt-1 flex-1"
-                    placeholder="Opcional"
-                  />
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 mt-1">
-                    <input
-                      type="checkbox"
-                      id="ra-check"
-                      {...register("recursoAmparo")}
-                      className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                )}
+              </Field>
+              <Field
+                className="md:col-span-3"
+                label={FIELD_LABELS.prescriberTexto}
+                required
+                error={
+                  formState.errors.prescriberId?.message ?? formState.errors.prescriberTexto?.message
+                }
+              >
+                {(f) => (
+                  <>
+                    <Input
+                      className="mt-1"
+                      list="prescriber-suggestions"
+                      placeholder="Escriba para buscar"
+                      {...f}
+                      {...register("prescriberTexto")}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setValue("prescriberTexto", val, { shouldValidate: true });
+                        const match = prescribers.find((p) => personLabel(p) === val);
+                        setValue("prescriberId", match?.id ?? "", { shouldValidate: true });
+                      }}
+                      onBlur={() => {
+                        const val =
+                          (document.querySelector('input[name="prescriberTexto"]') as HTMLInputElement | null)?.value ??
+                          "";
+                        const match = prescribers.find((p) => personLabel(p) === val);
+                        setValue("prescriberId", match?.id ?? "", { shouldValidate: true });
+                      }}
                     />
-                    <label htmlFor="ra-check" className="cursor-pointer text-xs font-bold text-blue-800">
-                      RA
-                    </label>
+                    <datalist id="prescriber-suggestions">
+                      {prescribers.map((p) => (
+                        <option key={p.id} value={personLabel(p)} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.claveAutorizacion}
+                error={formState.errors.claveAutorizacion?.message}
+              >
+                {(f) => (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      {...f}
+                      {...register("claveAutorizacion")}
+                      className="mt-1 flex-1"
+                      placeholder="Opcional"
+                    />
+                    <div className="mt-1 flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        id="ra-check"
+                        {...register("recursoAmparo")}
+                        className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="ra-check" className="cursor-pointer text-xs font-bold text-blue-800">
+                        RA
+                        <span className="sr-only"> (recurso de amparo)</span>
+                      </label>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Adquisición *</label>
-                <Select className="mt-1" {...register("adquisicion")}>
-                  <option value="almacenable">ALMACENABLE</option>
-                  <option value="compra_local">COMPRA LOCAL</option>
-                </Select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Observaciones</label>
-                <Input {...register("observaciones")} className="mt-1" placeholder="Texto corto" />
-              </div>
-              <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-zinc-600">
+                )}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.adquisicion}
+                required
+                error={formState.errors.adquisicion?.message}
+              >
+                {(f) => (
+                  <Select className="mt-1" {...f} {...register("adquisicion")}>
+                    <option value="almacenable">ALMACENABLE</option>
+                    <option value="compra_local">COMPRA LOCAL</option>
+                  </Select>
+                )}
+              </Field>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.observaciones}
+                error={formState.errors.observaciones?.message}
+              >
+                {(f) => (
+                  <Input {...f} {...register("observaciones")} className="mt-1" placeholder="Texto corto" />
+                )}
+              </Field>
+              {/* Varias entradas bajo un mismo rótulo: `fieldset`/`legend` es lo
+                  que agrupa; cada fila lleva su propio nombre accesible. */}
+              <fieldset className="md:col-span-3">
+                <legend className="block text-xs font-medium text-zinc-600">
                   Fechas de aplicación (máx. 16)
-                </label>
+                </legend>
                 <div className="mt-1 flex flex-col gap-2">
                   {applyDates.map((d, idx) => (
                     <div key={`${idx}-${d}`} className="flex items-center gap-2">
                       <Input
                         inputMode="numeric"
                         placeholder="dd/mm/aaaa"
+                        aria-label={`Fecha de aplicación ${idx + 1} de ${applyDates.length}`}
                         value={applyDateTexts[idx] ?? (d ? formatDMY(d) : "")}
                         onChange={(e) => {
                           const raw = e.target.value;
@@ -1006,6 +1154,7 @@ export function AgendaDia() {
                         disabled={applyDates.length <= 1}
                       >
                         Quitar
+                        <span className="sr-only">{` fecha de aplicación ${idx + 1}`}</span>
                       </Button>
                     </div>
                   ))}
@@ -1040,42 +1189,67 @@ export function AgendaDia() {
                     </Button>
                   </div>
                 </div>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-zinc-600">Farmacéutico *</label>
-                <Input
-                  className="mt-1"
-                  list="pharmacist-suggestions"
-                  placeholder="ESCRIBA PARA BUSCAR"
-                  {...register("pharmacistTexto")}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setValue("pharmacistTexto", val, { shouldValidate: true });
-                    const match = pharmacists.find((p) => personLabel(p) === val);
-                    setValue("pharmacistId", match?.id ?? "", { shouldValidate: true });
-                  }}
-                  onBlur={() => {
-                    const val =
-                      (document.querySelector('input[name="pharmacistTexto"]') as HTMLInputElement | null)?.value ??
-                      "";
-                    const match = pharmacists.find((p) => personLabel(p) === val);
-                    setValue("pharmacistId", match?.id ?? "", { shouldValidate: true });
-                  }}
-                />
-                {formState.errors.pharmacistId ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.pharmacistId.message}</div>
-                ) : formState.errors.pharmacistTexto ? (
-                  <div className="mt-1 text-xs text-rose-700">{formState.errors.pharmacistTexto.message}</div>
-                ) : null}
-                <datalist id="pharmacist-suggestions">
-                  {pharmacists.map((p) => (
-                    <option key={p.id} value={personLabel(p)} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="md:col-span-7 flex items-end justify-end">
-                <Button variant="primary" type="submit" disabled={formState.isSubmitting || !formState.isValid}>
-                  Guardar
+              </fieldset>
+              <Field
+                className="md:col-span-2"
+                label={FIELD_LABELS.pharmacistTexto}
+                required
+                error={
+                  formState.errors.pharmacistId?.message ?? formState.errors.pharmacistTexto?.message
+                }
+              >
+                {(f) => (
+                  <>
+                    <Input
+                      className="mt-1"
+                      list="pharmacist-suggestions"
+                      placeholder="Escriba para buscar"
+                      {...f}
+                      {...register("pharmacistTexto")}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setValue("pharmacistTexto", val, { shouldValidate: true });
+                        const match = pharmacists.find((p) => personLabel(p) === val);
+                        setValue("pharmacistId", match?.id ?? "", { shouldValidate: true });
+                      }}
+                      onBlur={() => {
+                        const val =
+                          (document.querySelector('input[name="pharmacistTexto"]') as HTMLInputElement | null)?.value ??
+                          "";
+                        const match = pharmacists.find((p) => personLabel(p) === val);
+                        setValue("pharmacistId", match?.id ?? "", { shouldValidate: true });
+                      }}
+                    />
+                    <datalist id="pharmacist-suggestions">
+                      {pharmacists.map((p) => (
+                        <option key={p.id} value={personLabel(p)} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
+              </Field>
+              <div className="md:col-span-7 flex flex-col items-stretch gap-2 md:flex-row md:items-end md:justify-between">
+                {/* Antes el botón quedaba deshabilitado hasta que el formulario
+                    fuese válido: con doce campos obligatorios el usuario veía un
+                    botón apagado y ningún motivo. Ahora se puede enviar siempre,
+                    y el envío inválido nombra lo que falta y lleva el foco allí. */}
+                <div aria-live="polite" className="min-w-0">
+                  {missingFields.length ? (
+                    <div
+                      role="alert"
+                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800"
+                    >
+                      <span className="font-semibold">
+                        {missingFields.length === 1
+                          ? "Falta un campo obligatorio: "
+                          : `Faltan ${missingFields.length} campos obligatorios: `}
+                      </span>
+                      {missingFields.join(", ")}.
+                    </div>
+                  ) : null}
+                </div>
+                <Button variant="primary" type="submit" disabled={formState.isSubmitting}>
+                  {formState.isSubmitting ? "Guardando…" : "Guardar"}
                 </Button>
               </div>
             </form>
@@ -1095,15 +1269,17 @@ export function AgendaDia() {
               <div className="text-xs text-zinc-500">EDICIÓN COMPLETA (INCLUYE FECHAS DE APLICACIÓN)</div>
             </div>
             <div className="flex items-end gap-2">
-              <div className="w-56">
-                <label className="block text-[11px] font-medium text-zinc-600">MES</label>
-                <Input
-                  className="mt-1 py-1.5"
-                  type="month"
-                  value={ultimosMonth}
-                  onChange={(e) => setUltimosMonth(e.target.value)}
-                />
-              </div>
+              <Field label="Mes" className="w-56">
+                {(f) => (
+                  <Input
+                    {...f}
+                    className="mt-1 py-1.5"
+                    type="month"
+                    value={ultimosMonth}
+                    onChange={(e) => setUltimosMonth(e.target.value)}
+                  />
+                )}
+              </Field>
               <Button
                 variant="secondary"
                 type="button"
@@ -1343,7 +1519,12 @@ export function AgendaDia() {
                     onDoubleClick={() => startEdit(i)}
                   >
                     <td className="px-3 py-2 text-center">
-                      <StatusBadge value={i.estado} editable onChange={(v) => void updateItem(i.id, { estado: v })} />
+                      <StatusBadge
+                      value={i.estado}
+                      editable
+                      describedItem={i.nombre ?? i.identificacion}
+                      onChange={(v) => void updateItem(i.id, { estado: v })}
+                    />
                     </td>
                     <td className="px-3 py-2 text-center font-medium whitespace-nowrap">{i.identificacion}</td>
                     <td className="px-3 py-2 text-center">{i.nombre ?? ""}</td>
@@ -1452,7 +1633,12 @@ export function AgendaDia() {
                       <div className="text-sm font-semibold">{i.identificacion}</div>
                       <div className="text-sm text-zinc-600">{i.nombre ?? ""}</div>
                     </div>
-                    <StatusBadge value={i.estado} editable onChange={(v) => void updateItem(i.id, { estado: v })} />
+                    <StatusBadge
+                      value={i.estado}
+                      editable
+                      describedItem={i.nombre ?? i.identificacion}
+                      onChange={(v) => void updateItem(i.id, { estado: v })}
+                    />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                     <div className="col-span-2">
