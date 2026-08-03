@@ -16,7 +16,7 @@ export default function HistoricoPage() {
               items={[
                 { href: "/catalogo", label: "CATÁLOGO", icon: <BookOpen className="h-4 w-4" aria-hidden="true" /> },
                 { href: "/farmaceuticos", label: "FARMACÉUTICOS", icon: <UserRound className="h-4 w-4" aria-hidden="true" /> },
-                { href: "/prescriptores", label: "PRESCRIPTOR", icon: <Stethoscope className="h-4 w-4" aria-hidden="true" /> },
+                { href: "/prescriptores", label: "PRESCRIPTORES", icon: <Stethoscope className="h-4 w-4" aria-hidden="true" /> },
                 { href: "/historico", label: "HISTÓRICO", icon: <Archive className="h-4 w-4" aria-hidden="true" /> },
               ]}
             />

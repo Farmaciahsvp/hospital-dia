@@ -139,6 +139,8 @@ Al desplazarse, los botones rojos de eliminar y las píldoras de estado se trans
 **Arreglo:** mover ambos detrás de un panel de soporte, o mostrarlos solo cuando hay un error y solo para el rol administrador.
 
 ### 18. Estados de carga inconsistentes y descolocados
+**Corregido.** Componentes compartidos `FilasCargando` (esqueleto que reserva el alto de la tabla) y `Cargando` (indicador con giro y `role="status"`). Sustituyen a las nueve variantes de "CARGANDO..." que había.
+
 "CARGANDO…" aparece como texto gris pequeño alineado a la derecha, lejos del área que va a cambiar (Pacientes, Medicamentos, Estadística, Histórico). No hay esqueletos ni reserva de espacio, así que el contenido salta al llegar. En Estadística la espera fue de varios segundos con la pantalla prácticamente vacía.
 
 ### 19. Página 404 en inglés y sin salida
@@ -249,15 +251,23 @@ Se validan en el formulario y de nuevo en `/api/items`: la primera guía, la seg
 `src/components/agenda/AgendaItemActions.tsx:63` — durante la edición en línea, el botón de cancelar se llama "Esc". Es el nombre de una tecla, no una acción. Debería decir "Cancelar" (y mencionar el atajo aparte).
 
 ### 21. Fecha de aplicación anterior a la de recepción
+**Corregido.** Aviso en ámbar bajo el campo, nombrando las fechas afectadas. Avisa en vez de bloquear: la carga retroactiva puede ser legítima.
+
 Al cambiar la fecha de la agenda al 09/07/2026, "Fechas de aplicación" se sincroniza pero "Fecha de recepción" se queda en 01/08/2026: el formulario queda listo para registrar una aplicación **casi un mes anterior** a su recepción, sin aviso.
 
 ### 22. `/cuenta` es una página huérfana con el texto equivocado
+**Corregido.** El texto depende de `x-app-must-change-password`, hay enlace "Volver a la agenda" y la barra lateral enlaza "Cambiar contraseña".
+
 No está enlazada desde ninguna navegación. Además muestra "PRIMER INGRESO — Establezca su contraseña" incluso a un usuario que ya tiene contraseña; el texto solo encaja con el flujo de alta.
 
 ### 23. Vocabulario y capitalización inconsistentes
+**Corregido.** "Prescriptores" en plural, estados vacíos y encabezados en caja de frase, botones de autenticación igual.
+
 "Prescriptor" (singular) junto a "Farmacéuticos" y "Medicamentos" (plural). Estados vacíos con estilos distintos en la misma pantalla: "SIN REGISTROS" frente a "Sin pacientes para esta fecha/filtros." Títulos de tarjeta unas veces en versalitas ("PACIENTES REGISTRADOS") y otras en frase ("Pacientes del día"), en la misma vista.
 
 ### 24. Detalles menores
+**Corregido** salvo la recuperación de contraseña, que depende de configurar el correo en Supabase.
+
 - Sin enlace "saltar al contenido"; en la agenda hay que tabular por toda la barra lateral y la cabecera antes de llegar a la tabla.
 - Ningún `<input>` declara `autocomplete` fuera del login.
 - Los botones de icono tienen `aria-label` pero no `title`: quien ve la pantalla no tiene *tooltip* para distinguir lápiz / papelera / check.

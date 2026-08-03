@@ -9,6 +9,7 @@ import {
   BookOpen,
   CalendarDays,
   ClipboardList,
+  KeyRound,
   LogOut,
   Menu,
   Pill,
@@ -185,6 +186,17 @@ export function Sidebar({ authMode, user }: SidebarProps) {
           <p className="mt-1 text-xs font-semibold text-blue-100">
             {ROLE_LABELS[user.role] ?? user.role}
           </p>
+          {/* `/cuenta` existía pero no estaba enlazada desde ninguna
+              navegación: solo se llegaba si el sistema te forzaba a ella. */}
+          <Link
+            href="/cuenta"
+            onClick={() => setOpen(false)}
+            aria-current={pathname === "/cuenta" ? "page" : undefined}
+            className={`mt-3 flex items-center gap-2 rounded-xl border border-blue-800 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-blue-900 ${FOCUS_CLARO}`}
+          >
+            <KeyRound className="h-4 w-4" aria-hidden="true" />
+            CAMBIAR CONTRASEÑA
+          </Link>
           <form action="/auth/signout" method="post" className="mt-3">
             <button
               type="submit"

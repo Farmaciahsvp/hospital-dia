@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Pill, RefreshCw, Search } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
+import { FilasCargando, FilaVacia, Cargando } from "@/components/ui/TableStates";
 
 type MedicationCard = { key: string; nombre: string; ids: string[]; count: number };
 type PatientRow = {
@@ -136,10 +137,22 @@ export function MedicamentosPanel() {
             </div>
 
             <div className="mt-3 max-h-[70vh] space-y-2 overflow-auto pr-1">
+              {loadingMeds
+                ? Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    aria-hidden="true"
+                    className="rounded-2xl border border-zinc-200 bg-white px-4 py-4"
+                  >
+                    <span className="block h-3 w-2/3 animate-pulse rounded bg-zinc-200" />
+                    <span className="mt-2 block h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+                  </div>
+                ))
+                : null}
               {loadingMeds ? (
-                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-600">
-                  CARGANDO...
-                </div>
+                <span role="status" className="sr-only">
+                  Cargando medicamentos…
+                </span>
               ) : null}
 
               {filteredMeds.map((m) => {
@@ -201,7 +214,7 @@ export function MedicamentosPanel() {
             ) : null}
 
             <div className="mt-3 text-sm text-zinc-600">
-              {loadingPatients ? "CARGANDO..." : `${patientsTotal} PACIENTES`}
+              {loadingPatients ? <Cargando /> : `${patientsTotal} pacientes`}
             </div>
 
             <div className="mt-3 overflow-auto rounded-2xl border border-zinc-200">
@@ -230,12 +243,15 @@ export function MedicamentosPanel() {
                       <td className="px-3 py-2 text-center">{p.lineas}</td>
                     </tr>
                   ))}
+                  {loadingPatients && !patients.length ? (
+                    <FilasCargando columnas={4} />
+                  ) : null}
                   {!patients.length && !loadingPatients ? (
-                    <tr>
-                      <td colSpan={4} className="px-3 py-10 text-center text-sm text-zinc-500">
-                        SIN PACIENTES
-                      </td>
-                    </tr>
+                    <FilaVacia
+                      columnas={4}
+                      mensaje="Sin pacientes."
+                      detalle="Seleccione un medicamento de la lista."
+                    />
                   ) : null}
                 </tbody>
               </table>
