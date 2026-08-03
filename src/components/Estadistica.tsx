@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchJson } from "@/lib/api-client";
+import { Cargando } from "@/components/ui/TableStates";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { RefreshCw } from "lucide-react";
@@ -110,7 +111,7 @@ export function Estadistica() {
               ) : null}
             </div>
           </div>
-          <div className="text-sm text-zinc-600">{loading ? "CARGANDO..." : ""}</div>
+          <div className="text-sm text-zinc-600">{loading ? <Cargando /> : null}</div>
         </div>
 
         {error ? (

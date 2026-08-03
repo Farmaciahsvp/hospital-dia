@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, type FieldErrors } from "react-hook-form";
+import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toISODateString } from "@/lib/date";
 import { MAX_APPLY_DATES } from "@/lib/domain-rules";
@@ -243,7 +243,7 @@ export function AgendaDia() {
     [activeStatuses],
   );
 
-  const { register, handleSubmit, setValue, setFocus, reset, formState, getValues } = useForm<QuickForm>({
+  const { register, handleSubmit, setValue, setFocus, reset, formState, getValues, control } = useForm<QuickForm>({
     resolver: zodResolver(quickSchema),
     mode: "onBlur",
     reValidateMode: "onChange",
@@ -273,6 +273,15 @@ export function AgendaDia() {
 
   /** Rótulos de los campos obligatorios que faltaron en el último envío. */
   const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  const fechaRecepcionActual = useWatch({ control, name: "fechaRecepcion" });
+  /** Fechas de aplicación anteriores a la de recepción, en formato dd/mm/aaaa. */
+  const fechasAnterioresARecepcion = useMemo(() => {
+    if (!fechaRecepcionActual) return [];
+    return applyDates
+      .filter((d) => d && d < fechaRecepcionActual)
+      .map((d) => formatDMY(d));
+  }, [applyDates, fechaRecepcionActual]);
 
   const statusTriggerRef = useRef<HTMLButtonElement | null>(null);
   const quickIdentRef = useRef<HTMLInputElement | null>(null);
@@ -1180,6 +1189,22 @@ export function AgendaDia() {
                 <legend className="block text-xs font-medium text-zinc-600">
                   Fechas de aplicación (máx. 16)
                 </legend>
+                {/* Al cambiar la fecha de la agenda se sincronizan las fechas de
+                    aplicación pero no la de recepción, así que era fácil acabar
+                    registrando una aplicación anterior a la receta sin enterarse.
+                    Se avisa en vez de bloquear: puede haber casos legítimos de
+                    carga retroactiva. */}
+                {fechasAnterioresARecepcion.length ? (
+                  <p
+                    role="status"
+                    className="mt-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                  >
+                    {fechasAnterioresARecepcion.length === 1
+                      ? `La fecha ${fechasAnterioresARecepcion[0]} es anterior a la de recepción.`
+                      : `${fechasAnterioresARecepcion.length} fechas son anteriores a la de recepción: ${fechasAnterioresARecepcion.join(", ")}.`}{" "}
+                    Revise que sea correcto.
+                  </p>
+                ) : null}
                 <div className="mt-1 flex flex-col gap-2">
                   {applyDates.map((d, idx) => (
                     <div key={`${idx}-${d}`} className="flex items-center gap-2">
@@ -1354,8 +1379,8 @@ export function AgendaDia() {
         <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
           <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold text-zinc-900">PACIENTES REGISTRADOS</h2>
-              <div className="text-xs text-zinc-500">EDICIÓN COMPLETA (INCLUYE FECHAS DE APLICACIÓN)</div>
+              <h2 className="text-sm font-semibold text-zinc-900">Pacientes registrados</h2>
+              <div className="text-xs text-zinc-500">Edición completa (incluye fechas de aplicación)</div>
             </div>
             <div className="flex items-end gap-2">
               <Field label="Mes" className="w-56">
@@ -1433,14 +1458,14 @@ export function AgendaDia() {
                 {!ultimos.length && !loadingUltimos ? (
                   <tr>
                     <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500">
-                      SIN REGISTROS
+                      Sin registros este mes.
                     </td>
                   </tr>
                 ) : null}
                 {loadingUltimos ? (
                   <tr>
                     <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500">
-                      CARGANDO...
+                      Cargando…
                     </td>
                   </tr>
                 ) : null}
@@ -1492,6 +1517,7 @@ export function AgendaDia() {
                             })
                           }
                           aria-label="Editar paciente"
+                          title="Editar paciente"
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                         </Button>
@@ -1507,6 +1533,7 @@ export function AgendaDia() {
                             })
                           }
                           aria-label="Eliminar paciente del día"
+                          title="Eliminar paciente del día"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </Button>
@@ -1522,6 +1549,7 @@ export function AgendaDia() {
                             })
                           }
                           aria-label="Finalizar (enviar a histórico)"
+                          title="Finalizar (enviar a histórico)"
                         >
                           <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                         </Button>

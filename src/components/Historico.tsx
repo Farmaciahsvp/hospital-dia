@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/Modal";
 import { Search } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
+import { FilasCargando, FilaVacia, Cargando } from "@/components/ui/TableStates";
 
 type HistoricoRequest = {
   id: string;
@@ -113,7 +114,7 @@ export function Historico() {
             </div>
           </div>
           <div className="text-sm text-zinc-600">
-            {loading ? "CARGANDO..." : `${filtered.length} REGISTROS`}
+            {loading ? <Cargando /> : `${filtered.length} registros`}
           </div>
         </div>
 
@@ -157,12 +158,9 @@ export function Historico() {
                   </td>
                 </tr>
               ))}
+              {loading && !filtered.length ? <FilasCargando columnas={6} /> : null}
               {!filtered.length && !loading ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-10 text-center text-sm text-zinc-500">
-                    SIN REGISTROS
-                  </td>
-                </tr>
+                <FilaVacia columnas={6} mensaje="Sin registros para esta fecha." />
               ) : null}
             </tbody>
           </table>
@@ -194,7 +192,7 @@ export function Historico() {
         }
       >
         {openReqLoading ? (
-          <div className="text-sm text-zinc-600">CARGANDO...</div>
+          <Cargando />
         ) : (
           <div className="overflow-auto rounded-xl border border-zinc-200">
             <table className="min-w-full text-center text-sm">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Pencil, Search, Trash2 } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
+import { FilasCargando, FilaVacia, Cargando } from "@/components/ui/TableStates";
 import { MAX_APPLY_DATES } from "@/lib/domain-rules";
 
 type Row = {
@@ -172,7 +173,7 @@ export function RegistroPacientes() {
             </div>
           </div>
           <div className="text-sm text-zinc-600">
-            {loading ? "CARGANDO..." : `${total} REGISTROS`}
+            {loading ? <Cargando /> : `${total} registros`}
           </div>
         </div>
 
@@ -249,6 +250,7 @@ export function RegistroPacientes() {
                         type="button"
                         className="px-2 py-2"
                         aria-label="Editar paciente"
+                        title="Editar paciente"
                         onClick={() =>
                           setToEditPatient({
                             patientId: r.patientId,
@@ -285,12 +287,13 @@ export function RegistroPacientes() {
                   </td>
                 </tr>
               ))}
+              {loading && !filtered.length ? <FilasCargando columnas={9} /> : null}
               {!filtered.length && !loading ? (
-                <tr>
-                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-zinc-500">
-                    SIN REGISTROS
-                  </td>
-                </tr>
+                <FilaVacia
+                  columnas={9}
+                  mensaje="Sin registros."
+                  detalle={query ? "Pruebe con otra búsqueda." : undefined}
+                />
               ) : null}
             </tbody>
           </table>

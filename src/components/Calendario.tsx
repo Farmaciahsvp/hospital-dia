@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, RefreshCw } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
+import { Cargando } from "@/components/ui/TableStates";
 import { exportCalendarDayPdf, type CalendarDayExportRow } from "@/lib/export";
 
 type DayPatient = {
@@ -492,7 +493,7 @@ export function Calendario() {
             ) : null}
 
             <div className="mt-3 text-center text-sm text-zinc-600">
-              {loading ? "CARGANDO..." : `${patients.length} PACIENTES`}
+              {loading ? <Cargando /> : `${patients.length} pacientes`}
             </div>
 
             <div className="mt-3 max-h-[70vh] space-y-3 overflow-auto pr-1">
@@ -529,7 +530,7 @@ export function Calendario() {
 
               {!patients.length && !loading ? (
                 <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-600">
-                  SIN PACIENTES PROGRAMADOS PARA ESTE DÍA.
+                  Sin pacientes programados para este día.
                 </div>
               ) : null}
             </div>

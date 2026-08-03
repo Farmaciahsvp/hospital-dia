@@ -21,12 +21,17 @@ export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { className, caja = "mayusculas", ...props },
+  { className, caja = "mayusculas", autoComplete, ...props },
   ref,
 ) {
   return (
     <input
       ref={ref}
+      // Ningún campo declaraba `autocomplete` fuera del login, así que el
+      // navegador ofrecía sugerencias de formularios ajenos sobre datos
+      // clínicos: cédulas y nombres de otros pacientes en el desplegable. Se
+      // desactiva por defecto y cada campo puede pedir lo contrario.
+      autoComplete={autoComplete ?? "off"}
       className={cn(
         "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400",
         caja === "mayusculas" ? "uppercase" : "normal-case",

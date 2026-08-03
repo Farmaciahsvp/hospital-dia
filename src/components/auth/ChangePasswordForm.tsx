@@ -84,7 +84,7 @@ export function ChangePasswordForm() {
         disabled={pending}
         className="w-full rounded-xl bg-blue-950 px-4 py-2.5 font-semibold text-white hover:bg-blue-900 disabled:cursor-wait disabled:opacity-60"
       >
-        {pending ? "GUARDANDO…" : "ESTABLECER CONTRASEÑA"}
+        {pending ? "Guardando…" : "Guardar contraseña"}
       </button>
     </form>
   );

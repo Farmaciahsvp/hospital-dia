@@ -79,6 +79,7 @@ function RowMenu({
         }}
         type="button"
         aria-label="Más acciones"
+        title="Más acciones"
         aria-haspopup="menu"
         aria-expanded={open}
       >
