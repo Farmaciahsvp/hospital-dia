@@ -14,6 +14,33 @@ export function toMonthInputValue(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
 }
 
+export function toDateInputValue(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+/**
+ * Primer y último día del mes de `date`, en el formato de `<input type="date">`.
+ * Es el rango por defecto de "Pacientes registrados": antes el filtro era un
+ * `<input type="month">` y no había forma de mirar una semana ni de cruzar meses.
+ */
+export function monthRangeOf(date) {
+  const from = new Date(date.getFullYear(), date.getMonth(), 1);
+  const to = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { from: toDateInputValue(from), to: toDateInputValue(to) };
+}
+
+/**
+ * Un rango sirve para consultar solo si ambas fechas están completas y la final
+ * no es anterior a la inicial. Comparar las cadenas ISO basta: son ordenables.
+ */
+export function isValidDateRange(from, to) {
+  const pattern = /^\d{4}-\d{2}-\d{2}$/;
+  const desde = String(from ?? "");
+  const hasta = String(to ?? "");
+  if (!pattern.test(desde) || !pattern.test(hasta)) return false;
+  return desde <= hasta;
+}
+
 /**
  * Deja solo dígitos y recorta a 6. Con `pad`, rellena con ceros a la izquierda
  * (lo que espera el campo al perder el foco). Cadena vacía se conserva vacía.

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRequestId, jsonFailure, jsonOk } from "@/lib/api-server";
+import { getRequestId, jsonError, jsonFailure, jsonOk } from "@/lib/api-server";
 
 function parseMonthParam(raw: string | null) {
   if (!raw) return null;
@@ -14,6 +14,37 @@ function parseMonthParam(raw: string | null) {
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 1));
   return { start, end };
+}
+
+/**
+ * Rango cerrado `from`/`to` en formato `YYYY-MM-DD`, la misma convención que
+ * `/api/medicamentos-rango` y `/api/estadistica`. Se devuelve como intervalo
+ * semiabierto `[start, end)` para poder compararlo igual que el de mes.
+ */
+function parseRangeParams(fromRaw: string | null, toRaw: string | null) {
+  if (!fromRaw && !toRaw) return { ok: true as const, range: null };
+  if (!fromRaw || !toRaw) {
+    return { ok: false as const, error: "Indique la fecha inicial y la final del rango" };
+  }
+
+  const pattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!pattern.test(fromRaw.trim()) || !pattern.test(toRaw.trim())) {
+    return { ok: false as const, error: "Rango de fechas inválido" };
+  }
+
+  const start = new Date(`${fromRaw.trim()}T00:00:00.000Z`);
+  const to = new Date(`${toRaw.trim()}T00:00:00.000Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(to.getTime())) {
+    return { ok: false as const, error: "Rango de fechas inválido" };
+  }
+  if (to < start) {
+    return { ok: false as const, error: "La fecha final no puede ser menor a la inicial" };
+  }
+
+  // `to` es inclusivo para quien consulta; la consulta usa el día siguiente.
+  const end = new Date(to);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { ok: true as const, range: { start, end } };
 }
 
 type RecordRow = {
@@ -41,19 +72,26 @@ export async function GET(request: Request) {
   const requestId = getRequestId(request);
   try {
     const url = new URL(request.url);
-    const monthRange = parseMonthParam(url.searchParams.get("month"));
+    const parsedRange = parseRangeParams(
+      url.searchParams.get("from"),
+      url.searchParams.get("to"),
+    );
+    if (!parsedRange.ok) return jsonError(requestId, parsedRange.error, { status: 400 });
+
+    // `month` se conserva por compatibilidad; la agenda ya consulta por rango.
+    const range = parsedRange.range ?? parseMonthParam(url.searchParams.get("month"));
     const takeRaw = url.searchParams.get("take");
     const take = takeRaw ? Math.min(Math.max(Number(takeRaw), 1), 5000) : null;
-    const effectiveTake = take ?? (monthRange ? null : 5);
+    const effectiveTake = take ?? (range ? null : 5);
 
     const items = await prisma.prepRequestItem.findMany({
-      where: monthRange
+      where: range
         ? {
             prepRequest: {
               is: {
                 OR: [
-                  { fechaRecepcion: { gte: monthRange.start, lt: monthRange.end } },
-                  { fechaRecepcion: null, createdAt: { gte: monthRange.start, lt: monthRange.end } },
+                  { fechaRecepcion: { gte: range.start, lt: range.end } },
+                  { fechaRecepcion: null, createdAt: { gte: range.start, lt: range.end } },
                 ],
               },
             },
@@ -93,7 +131,7 @@ export async function GET(request: Request) {
         },
       },
       orderBy: [{ createdAt: "desc" }],
-      ...(monthRange ? {} : { take: 250 }),
+      ...(range ? {} : { take: 250 }),
     });
 
     const grouped = new Map<string, RecordRow & { sortAt: string }>();

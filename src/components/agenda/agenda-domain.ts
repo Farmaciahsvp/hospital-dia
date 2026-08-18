@@ -119,6 +119,12 @@ export const personLabel: (p: PersonOption) => string = domain.personLabel;
 
 export const toMonthInputValue: (date: Date) => string = domain.toMonthInputValue;
 
+export const toDateInputValue: (date: Date) => string = domain.toDateInputValue;
+
+export const monthRangeOf: (date: Date) => { from: string; to: string } = domain.monthRangeOf;
+
+export const isValidDateRange: (from: string, to: string) => boolean = domain.isValidDateRange;
+
 export const normalizeNumeroReceta: (
   raw: unknown,
   options?: { pad?: boolean },
@@ -132,7 +138,8 @@ export function useDebouncedValue<T>(value: T, delayMs: number) {
   }, [value, delayMs]);
   return debounced;
 }
-export const toExportRows: (items: AgendaItem[]) => ExportRow[] = domain.toExportRows;
+
+export const toExportRows: (items: AgendaItem[]) => ExportRow[] = domain.toExportRows;
 
 export const buildStatusCounts: (items: AgendaItem[]) => Record<ItemStatus, number> =
   domain.buildStatusCounts;

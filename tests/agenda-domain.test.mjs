@@ -7,10 +7,13 @@ import {
   buildStatusCounts,
   formatDMY,
   isoToUtcDate,
+  isValidDateRange,
+  monthRangeOf,
   normalizeNumeroReceta,
   parseDateInputToISO,
   parseFrequencyStep,
   personLabel,
+  toDateInputValue,
   toExportRows,
   toMonthInputValue,
 } from "../src/components/agenda/agenda-domain.mjs";
@@ -203,6 +206,32 @@ test("formatDMY devuelve la entrada intacta si no es una fecha ISO", () => {
 test("toMonthInputValue produce el valor de un <input type=month>", () => {
   assert.equal(toMonthInputValue(new Date(2026, 0, 15)), "2026-01");
   assert.equal(toMonthInputValue(new Date(2026, 11, 1)), "2026-12");
+});
+
+test("toDateInputValue produce el valor de un <input type=date>", () => {
+  assert.equal(toDateInputValue(new Date(2026, 0, 5)), "2026-01-05");
+  assert.equal(toDateInputValue(new Date(2026, 11, 31)), "2026-12-31");
+});
+
+test("monthRangeOf abarca el mes completo de la fecha dada", () => {
+  assert.deepEqual(monthRangeOf(new Date(2026, 7, 18)), {
+    from: "2026-08-01",
+    to: "2026-08-31",
+  });
+  // Febrero bisiesto: el último día lo calcula el propio calendario.
+  assert.deepEqual(monthRangeOf(new Date(2028, 1, 10)), {
+    from: "2028-02-01",
+    to: "2028-02-29",
+  });
+});
+
+test("isValidDateRange exige dos fechas completas y en orden", () => {
+  assert.equal(isValidDateRange("2026-08-01", "2026-08-31"), true);
+  assert.equal(isValidDateRange("2026-08-05", "2026-08-05"), true);
+  assert.equal(isValidDateRange("2026-08-31", "2026-08-01"), false);
+  assert.equal(isValidDateRange("2026-08", "2026-08-31"), false);
+  assert.equal(isValidDateRange("", "2026-08-31"), false);
+  assert.equal(isValidDateRange("2026-08-01", ""), false);
 });
 
 test("personLabel une código, nombres y apellidos", () => {

@@ -32,6 +32,8 @@ import {
   buildPatientsOfDay,
   buildStatusCounts,
   formatDMY,
+  isValidDateRange,
+  monthRangeOf,
   normalizeNumeroReceta,
   isoToUtcDate,
   MedicationSuggestion,
@@ -43,7 +45,6 @@ import {
   quickSchema,
   QuickForm,
   toExportRows,
-  toMonthInputValue,
   UltimoRegistro,
   useDebouncedValue,
 } from "@/components/agenda/agenda-domain";
@@ -59,6 +60,7 @@ import { Select } from "@/components/ui/Select";
 import { NavPills } from "@/components/NavPills";
 import {
   BookOpen,
+  ChevronRight,
   FileText,
   Plus,
   Printer,
@@ -169,7 +171,12 @@ export function AgendaDia() {
   const [pharmacists, setPharmacists] = useState<PersonOption[]>([]);
 
   const [ultimos, setUltimos] = useState<UltimoRegistro[]>([]);
-  const [ultimosMonth, setUltimosMonth] = useState(() => toMonthInputValue(new Date()));
+  // El filtro era un solo mes; ahora es un rango libre que arranca en el mes en
+  // curso, para poder mirar una semana o cruzar el corte de mes sin perder nada.
+  const [ultimosRango, setUltimosRango] = useState(() => monthRangeOf(new Date()));
+  // La tarjeta arranca plegada: es la más larga de la agenda y empujaba el resto
+  // de la vista fuera de pantalla.
+  const [ultimosAbierto, setUltimosAbierto] = useState(false);
   const [loadingUltimos, setLoadingUltimos] = useState(false);
   const [editUltimo, setEditUltimo] = useState<UltimoRegistro | null>(null);
   const [editDates, setEditDates] = useState<string[]>([]);
@@ -350,17 +357,22 @@ export function AgendaDia() {
     })();
   }, []);
 
+  const rangoUltimosValido = isValidDateRange(ultimosRango.from, ultimosRango.to);
+
   const loadUltimos = useCallback(async () => {
+    // Mientras el rango esté a medio escribir o invertido no se consulta: el
+    // aviso de la tarjeta dice qué corregir.
+    if (!isValidDateRange(ultimosRango.from, ultimosRango.to)) return;
     setLoadingUltimos(true);
     try {
-      setUltimos(await fetchUltimosRegistros(ultimosMonth));
+      setUltimos(await fetchUltimosRegistros(ultimosRango));
     } catch (e) {
       setUltimos([]);
       setToast({ kind: "error", message: e instanceof Error ? e.message : "Error" });
     } finally {
       setLoadingUltimos(false);
     }
-  }, [ultimosMonth]);
+  }, [ultimosRango]);
 
   useEffect(() => {
     void loadUltimos();
@@ -1377,20 +1389,61 @@ export function AgendaDia() {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm print:hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold text-zinc-900">Pacientes registrados</h2>
-              <div className="text-xs text-zinc-500">Edición completa (incluye fechas de aplicación)</div>
-            </div>
-            <div className="flex items-end gap-2">
-              <Field label="Mes" className="w-56">
+          {/* La cabecera es el propio control de plegado: un botón con
+              `aria-expanded` sobre el panel, para que el estado se anuncie y se
+              alcance con el teclado igual que con el ratón. */}
+          <h2
+            className={`text-sm font-semibold text-zinc-900 ${
+              ultimosAbierto ? "border-b border-zinc-200" : ""
+            }`}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50"
+              aria-expanded={ultimosAbierto}
+              aria-controls="ultimos-registros-panel"
+              onClick={() => setUltimosAbierto((open) => !open)}
+            >
+              <ChevronRight
+                className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${
+                  ultimosAbierto ? "rotate-90" : ""
+                }`}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1">
+                Pacientes registrados
+                <span className="block text-xs font-normal text-zinc-500">
+                  Edición completa (incluye fechas de aplicación)
+                </span>
+              </span>
+              <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                {loadingUltimos ? "…" : `${ultimos.length} ${ultimos.length === 1 ? "registro" : "registros"}`}
+              </span>
+            </button>
+          </h2>
+          <div id="ultimos-registros-panel" hidden={!ultimosAbierto}>
+            <div className="flex flex-wrap items-end justify-end gap-2 border-b border-zinc-200 px-4 py-3">
+              <Field label="Desde" className="w-44">
                 {(f) => (
                   <Input
                     {...f}
                     className="mt-1 py-1.5"
-                    type="month"
-                    value={ultimosMonth}
-                    onChange={(e) => setUltimosMonth(e.target.value)}
+                    type="date"
+                    value={ultimosRango.from}
+                    onChange={(e) =>
+                      setUltimosRango((r) => ({ ...r, from: e.target.value }))
+                    }
+                  />
+                )}
+              </Field>
+              <Field label="Hasta" className="w-44">
+                {(f) => (
+                  <Input
+                    {...f}
+                    className="mt-1 py-1.5"
+                    type="date"
+                    value={ultimosRango.to}
+                    onChange={(e) => setUltimosRango((r) => ({ ...r, to: e.target.value }))}
                   />
                 )}
               </Field>
@@ -1398,79 +1451,88 @@ export function AgendaDia() {
                 variant="secondary"
                 type="button"
                 className="py-1.5"
+                disabled={!rangoUltimosValido}
                 onClick={() => void loadUltimos()}
               >
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 ACTUALIZAR
               </Button>
             </div>
-          </div>
-          <div className="overflow-auto">
-            <table className="min-w-full text-center text-sm text-blue-950">
-              {/* El título vivía fuera de la tabla, así que la tabla en sí no
-                  tenía nombre al navegarla con lector de pantalla. */}
-              <caption className="sr-only">
-                Pacientes registrados del mes, con edición completa
-              </caption>
-              <thead className="bg-white">
-                <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                  <th scope="col" className="px-3 py-2 text-center">FECHA</th>
-                  <th scope="col" className="px-3 py-2 text-center">CÉDULA</th>
-                  <th scope="col" className="px-3 py-2 text-center">NOMBRE DEL PACIENTE</th>
-                  <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
-                  <th scope="col" className="px-3 py-2 text-center">DOSIS</th>
-                  <th scope="col" className="px-3 py-2 text-center">FRECUENCIA</th>
-                  <th scope="col" className="px-3 py-2 text-center">ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ultimos.map((r, idx) => (
-                  <tr
-                    key={r.id}
-                    className={`${idx % 2 === 0 ? "bg-white" : "bg-zinc-50"} border-b border-zinc-100`}
-                  >
-                    <td className="whitespace-nowrap px-3 py-2 text-center">
-                      {r.fecha ? formatDMY(r.fecha) : "-"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-center font-medium">{r.cedula}</td>
-                    <td className="px-3 py-2 text-center">{r.nombre ?? ""}</td>
-                    <td className="px-3 py-2 text-center">{r.medicamento}</td>
-                    <td className="px-3 py-2 text-center">{r.dosisTexto}</td>
-                    <td className="px-3 py-2 text-center">{r.frecuencia ?? "-"}</td>
-                    <td className="px-3 py-2 text-center whitespace-nowrap">
-                      <Button
-                        variant="subtle"
-                        type="button"
-                        className="px-2 py-2"
-                        aria-label="Editar registro"
-                        onClick={() => {
-                          setEditUltimo(r);
-                          setEditDates(r.fechasAplicacion);
-                          setEditMedicationTexto(r.medicamento);
-                          setEditMedicationId(r.medicationId);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </td>
+            {!rangoUltimosValido ? (
+              <div
+                role="alert"
+                className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-800"
+              >
+                Indique ambas fechas; la final no puede ser anterior a la inicial.
+              </div>
+            ) : null}
+            <div className="overflow-auto">
+              <table className="min-w-full text-center text-sm text-blue-950">
+                {/* El título vivía fuera de la tabla, así que la tabla en sí no
+                    tenía nombre al navegarla con lector de pantalla. */}
+                <caption className="sr-only">
+                  Pacientes registrados en el rango de fechas seleccionado, con edición completa
+                </caption>
+                <thead className="bg-white">
+                  <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
+                    <th scope="col" className="px-3 py-2 text-center">FECHA</th>
+                    <th scope="col" className="px-3 py-2 text-center">CÉDULA</th>
+                    <th scope="col" className="px-3 py-2 text-center">NOMBRE DEL PACIENTE</th>
+                    <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
+                    <th scope="col" className="px-3 py-2 text-center">DOSIS</th>
+                    <th scope="col" className="px-3 py-2 text-center">FRECUENCIA</th>
+                    <th scope="col" className="px-3 py-2 text-center">ACCIONES</th>
                   </tr>
-                ))}
-                {!ultimos.length && !loadingUltimos ? (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500">
-                      Sin registros este mes.
-                    </td>
-                  </tr>
-                ) : null}
-                {loadingUltimos ? (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500">
-                      Cargando…
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {ultimos.map((r, idx) => (
+                    <tr
+                      key={r.id}
+                      className={`${idx % 2 === 0 ? "bg-white" : "bg-zinc-50"} border-b border-zinc-100`}
+                    >
+                      <td className="whitespace-nowrap px-3 py-2 text-center">
+                        {r.fecha ? formatDMY(r.fecha) : "-"}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-center font-medium">{r.cedula}</td>
+                      <td className="px-3 py-2 text-center">{r.nombre ?? ""}</td>
+                      <td className="px-3 py-2 text-center">{r.medicamento}</td>
+                      <td className="px-3 py-2 text-center">{r.dosisTexto}</td>
+                      <td className="px-3 py-2 text-center">{r.frecuencia ?? "-"}</td>
+                      <td className="px-3 py-2 text-center whitespace-nowrap">
+                        <Button
+                          variant="subtle"
+                          type="button"
+                          className="px-2 py-2"
+                          aria-label="Editar registro"
+                          onClick={() => {
+                            setEditUltimo(r);
+                            setEditDates(r.fechasAplicacion);
+                            setEditMedicationTexto(r.medicamento);
+                            setEditMedicationId(r.medicationId);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!ultimos.length && !loadingUltimos ? (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500">
+                        Sin registros en el rango seleccionado.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {loadingUltimos ? (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500">
+                        Cargando…
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
