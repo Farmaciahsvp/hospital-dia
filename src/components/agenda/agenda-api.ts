@@ -88,14 +88,19 @@ export async function fetchStaffOptions(): Promise<StaffOptionsResponse> {
   return { prescribers, pharmacists };
 }
 
-export async function fetchUltimosRegistros(month?: string): Promise<UltimoRegistro[]> {
+export async function fetchUltimosRegistros(
+  range?: { from: string; to: string },
+): Promise<UltimoRegistro[]> {
   const url = new URL("/api/ultimos-registros", window.location.origin);
-  if (month) url.searchParams.set("month", month);
+  if (range) {
+    url.searchParams.set("from", range.from);
+    url.searchParams.set("to", range.to);
+  }
   const res = await fetch(url.toString(), { cache: "no-store" });
   const data = (await res.json()) as UltimosRegistrosResponse;
   if (!res.ok) {
     const message = data.error || "No se pudo cargar";
-    logAgendaApiError(message, month ? `month=${month}` : undefined);
+    logAgendaApiError(message, range ? `from=${range.from}&to=${range.to}` : undefined);
     throw new Error(message);
   }
   return data.rows ?? [];
