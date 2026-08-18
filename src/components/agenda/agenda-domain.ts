@@ -50,6 +50,10 @@ export type UltimoRegistro = {
   unidadesRequeridas: number;
   frecuencia: string | null;
   fechasAplicacion: string[];
+  /** Las fechas de aplicación que caen dentro del rango consultado: son las que
+   *  la tabla muestra y las que explican por qué la fila está en la lista. La
+   *  edición sigue trabajando sobre `fechasAplicacion`, que va completa. */
+  fechasEnRango: string[];
   fechaRecepcion: string | null;
   numeroReceta: string | null;
   prescriberId: string | null;
