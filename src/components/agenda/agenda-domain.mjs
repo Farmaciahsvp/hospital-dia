@@ -2,6 +2,8 @@
 // Misma convención que `src/lib/access-gate.mjs` y `src/lib/auth/permissions.mjs`.
 // `agenda-domain.ts` reexporta todo esto con los tipos del dominio.
 
+import { esRangoValido } from "../../lib/rango-fechas.mjs";
+
 export function personLabel(p) {
   return `${p.codigo} - ${p.nombres} ${p.apellidos}`.trim();
 }
@@ -30,15 +32,11 @@ export function monthRangeOf(date) {
 }
 
 /**
- * Un rango sirve para consultar solo si ambas fechas están completas y la final
- * no es anterior a la inicial. Comparar las cadenas ISO basta: son ordenables.
+ * La misma regla que aplica el endpoint, para no tener dos definiciones de
+ * "rango válido" que puedan separarse con el tiempo.
  */
 export function isValidDateRange(from, to) {
-  const pattern = /^\d{4}-\d{2}-\d{2}$/;
-  const desde = String(from ?? "");
-  const hasta = String(to ?? "");
-  if (!pattern.test(desde) || !pattern.test(hasta)) return false;
-  return desde <= hasta;
+  return esRangoValido(from, to);
 }
 
 /**

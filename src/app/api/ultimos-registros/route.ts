@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getRequestId, jsonError, jsonFailure, jsonOk } from "@/lib/api-server";
+import { fechasDentroDelRango } from "@/lib/rango-fechas.mjs";
 
 function parseMonthParam(raw: string | null) {
   if (!raw) return null;
@@ -65,6 +66,8 @@ type RecordRow = {
   adquisicion: "almacenable" | "compra_local";
   observaciones: string | null;
   fechasAplicacion: string[];
+  /** Las fechas de aplicación que caen dentro del rango consultado. */
+  fechasEnRango: string[];
   itemIds: string[];
 };
 
@@ -84,18 +87,39 @@ export async function GET(request: Request) {
     const take = takeRaw ? Math.min(Math.max(Number(takeRaw), 1), 5000) : null;
     const effectiveTake = take ?? (range ? null : 5);
 
+    const desde = range ? range.start.toISOString().slice(0, 10) : null;
+    // `range.end` es exclusivo; el rango que ve quien consulta termina el día
+    // anterior, que es también el que se compara contra cada fecha.
+    const hasta = range
+      ? new Date(range.end.getTime() - 86400000).toISOString().slice(0, 10)
+      : null;
+
+    // El filtro es por fecha de aplicación: una receta se recibe una vez y
+    // genera ciclos durante meses, así que filtrar por recepción dejaba fuera a
+    // casi todos los pacientes que se atienden en el mes.
+    //
+    // Se resuelve en dos pasos a propósito. Primero qué pacientes tienen alguna
+    // aplicación en el rango; después TODAS sus líneas, porque cada fila debe
+    // conservar su lista completa de fechas: editarla reescribe esas fechas y
+    // recortarlas al rango borraría las aplicaciones de los demás meses.
+    const patientIdsEnRango = range
+      ? Array.from(
+          new Set(
+            (
+              await prisma.prepRequest.findMany({
+                where: { fechaAplicacion: { gte: range.start, lt: range.end } },
+                select: { patientId: true },
+              })
+            ).map((pr) => pr.patientId),
+          ),
+        )
+      : [];
+
+    if (range && !patientIdsEnRango.length) return jsonOk(requestId, { rows: [] });
+
     const items = await prisma.prepRequestItem.findMany({
       where: range
-        ? {
-            prepRequest: {
-              is: {
-                OR: [
-                  { fechaRecepcion: { gte: range.start, lt: range.end } },
-                  { fechaRecepcion: null, createdAt: { gte: range.start, lt: range.end } },
-                ],
-              },
-            },
-          }
+        ? { prepRequest: { is: { patientId: { in: patientIdsEnRango } } } }
         : undefined,
       select: {
         id: true,
@@ -184,6 +208,7 @@ export async function GET(request: Request) {
           adquisicion: it.adquisicion,
           observaciones: it.observaciones ?? null,
           fechasAplicacion: [],
+          fechasEnRango: [],
           itemIds: [],
           sortAt: it.createdAt.toISOString(),
         } satisfies RecordRow & { sortAt: string });
@@ -200,12 +225,18 @@ export async function GET(request: Request) {
       .map((row) => {
         const { sortAt, ...rest } = row;
         void sortAt;
+        const fechasAplicacion = Array.from(new Set(rest.fechasAplicacion)).sort();
         return {
           ...rest,
-          fechasAplicacion: Array.from(new Set(rest.fechasAplicacion)).sort(),
+          fechasEnRango:
+            desde && hasta ? fechasDentroDelRango(fechasAplicacion, desde, hasta) : fechasAplicacion,
+          fechasAplicacion,
           itemIds: Array.from(new Set(rest.itemIds)),
         };
-      });
+      })
+      // La consulta trajo todas las líneas de esos pacientes para conservar sus
+      // fechas completas; en la lista solo van las que el rango justifica.
+      .filter((row) => !range || row.fechasEnRango.length > 0);
 
     const rows = effectiveTake ? sortedRows.slice(0, effectiveTake) : sortedRows;
     return jsonOk(requestId, { rows });

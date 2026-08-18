@@ -1413,7 +1413,7 @@ export function AgendaDia() {
               <span className="min-w-0 flex-1">
                 Pacientes registrados
                 <span className="block text-xs font-normal text-zinc-500">
-                  Edición completa (incluye fechas de aplicación)
+                  Filtra por fecha de aplicación; al editar se abren todas las fechas
                 </span>
               </span>
               <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
@@ -1471,11 +1471,11 @@ export function AgendaDia() {
                 {/* El título vivía fuera de la tabla, así que la tabla en sí no
                     tenía nombre al navegarla con lector de pantalla. */}
                 <caption className="sr-only">
-                  Pacientes registrados en el rango de fechas seleccionado, con edición completa
+                  Pacientes con aplicaciones en el rango de fechas seleccionado, con edición completa
                 </caption>
                 <thead className="bg-white">
                   <tr className="border-b border-zinc-200 text-xs font-semibold text-blue-900">
-                    <th scope="col" className="px-3 py-2 text-center">FECHA</th>
+                    <th scope="col" className="px-3 py-2 text-center">FECHAS DE APLICACIÓN</th>
                     <th scope="col" className="px-3 py-2 text-center">CÉDULA</th>
                     <th scope="col" className="px-3 py-2 text-center">NOMBRE DEL PACIENTE</th>
                     <th scope="col" className="px-3 py-2 text-center">MEDICAMENTO</th>
@@ -1490,8 +1490,21 @@ export function AgendaDia() {
                       key={r.id}
                       className={`${idx % 2 === 0 ? "bg-white" : "bg-zinc-50"} border-b border-zinc-100`}
                     >
-                      <td className="whitespace-nowrap px-3 py-2 text-center">
-                        {r.fecha ? formatDMY(r.fecha) : "-"}
+                      {/* Las fechas que caen en el rango consultado: son las que
+                          explican por qué la fila está en la lista. La edición
+                          sigue abriendo la lista completa del registro. */}
+                      <td className="px-3 py-2 text-center">
+                        {r.fechasEnRango.length ? (
+                          <div className="flex flex-col items-center">
+                            {r.fechasEnRango.map((f) => (
+                              <span key={f} className="whitespace-nowrap">
+                                {formatDMY(f)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-center font-medium">{r.cedula}</td>
                       <td className="px-3 py-2 text-center">{r.nombre ?? ""}</td>
