@@ -77,3 +77,14 @@ test("eliminar una ficha de paciente queda reservado al administrador", () => {
   assert.equal(hasPermission("pharmacist", "clinical.delete"), false);
   assert.equal(hasPermission("auditor", "clinical.delete"), false);
 });
+
+test("archivar recetas es una operación clínica, no una eliminación", () => {
+  const permission = permissionForApiRequest(
+    "PATCH",
+    "/api/registro-pacientes/archivo",
+  );
+  assert.equal(permission, "clinical.write");
+  assert.equal(hasPermission("administrator", permission), true);
+  assert.equal(hasPermission("pharmacist", permission), true);
+  assert.equal(hasPermission("auditor", permission), false);
+});

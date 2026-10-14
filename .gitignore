@@ -36,6 +36,7 @@ yarn-error.log*
 
 # local operational credentials
 /.phase0-secrets/
+/supabase/.temp/
 
 # vercel
 .vercel

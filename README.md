@@ -21,6 +21,7 @@ Abrir `http://localhost:3000`.
 - Pantalla única: agenda por fecha, búsquedas, chips de estado, contadores y “Última actualización”
 - Captura rápida (Enter para guardar) + tabla con edición inline por fila (doble clic / Enter)
 - Acciones: duplicar, marcar listo/entregado, cancelar
+- Archivo no destructivo de recetas, con consulta y restauración desde Pacientes
 - Exportar: PDF (agenda) + PDF consolidado por medicamento
 
 ## Supabase
