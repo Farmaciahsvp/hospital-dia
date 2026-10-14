@@ -14,6 +14,8 @@ type Row = {
   fechasAplicacionCumplidas: string[];
   itemIds: string[];
   farmaceutico: string | null;
+  archivedAt: string | null;
+  archivedBy: string | null;
 };
 
 export async function GET(request: Request) {
@@ -21,13 +23,21 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const includeHistorico = url.searchParams.get("historico") === "1";
+    const archiveView = url.searchParams.get("archivo") === "archivadas"
+      ? "archivadas"
+      : "activas";
     const q = (url.searchParams.get("q") ?? "").trim();
     const take = Math.min(Math.max(Number(url.searchParams.get("take") ?? "50"), 1), 200);
     const offset = Math.max(Number(url.searchParams.get("offset") ?? "0"), 0);
 
     const items = await prisma.prepRequestItem.findMany({
       where: {
-        ...(includeHistorico ? {} : { prepRequest: { is: { finalizadoAt: null } } }),
+        prepRequest: {
+          is: {
+            ...(includeHistorico ? {} : { finalizadoAt: null }),
+            archivedAt: archiveView === "archivadas" ? { not: null } : null,
+          },
+        },
         ...(q
           ? {
               OR: [
@@ -83,6 +93,8 @@ export async function GET(request: Request) {
             fechaRecepcion: true,
             numeroReceta: true,
             pharmacistId: true,
+            archivedAt: true,
+            archivedBy: true,
             patient: {
               select: {
                 id: true,
@@ -144,6 +156,8 @@ export async function GET(request: Request) {
           fechasAplicacionCumplidas: [],
           itemIds: [],
           farmaceutico,
+          archivedAt: pr.archivedAt?.toISOString() ?? null,
+          archivedBy: pr.archivedBy ?? null,
         } satisfies Row);
 
       const fechaAplicacionIso = pr.fechaAplicacion.toISOString().slice(0, 10);

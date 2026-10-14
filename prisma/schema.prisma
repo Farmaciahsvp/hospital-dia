@@ -103,6 +103,8 @@ model PrepRequest {
   observaciones   String?
   finalizadoAt    DateTime?
   finalizadoBy    String?
+  archivedAt      DateTime?
+  archivedBy      String?
   recursoAmparo   Boolean           @default(false)
   createdBy       String?
   updatedBy       String?
@@ -116,6 +118,8 @@ model PrepRequest {
   @@unique([fechaAplicacion, patientId])
   @@index([fechaAplicacion, patientId])
   @@index([numeroReceta])
+  @@index([archivedAt], map: "prep_requests_archived_at_idx")
+  @@index([patientId, numeroReceta, fechaRecepcion, archivedAt], map: "prep_requests_recipe_archive_idx")
   @@map("prep_requests")
 }
 

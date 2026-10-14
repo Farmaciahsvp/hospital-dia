@@ -268,6 +268,10 @@ export async function POST(request: Request) {
           prescriberId: body.prescriberId,
           pharmacistId: body.pharmacistId,
           recursoAmparo: body.recursoAmparo ?? false,
+          // Una captura nueva sobre la misma fecha vuelve a convertir esta
+          // solicitud en parte de la receta activa del paciente.
+          archivedAt: null,
+          archivedBy: null,
         },
         create: {
           fechaAplicacion: fecha,

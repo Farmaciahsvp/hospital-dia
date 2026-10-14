@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/Modal";
+import { Toast, type ToastState } from "@/components/Toast";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { Select } from "@/components/ui/Select";
+import { Archive, ArchiveRestore, Pencil, Search, Trash2 } from "lucide-react";
 import { fetchJson } from "@/lib/api-client";
 import { FilasCargando, FilaVacia, Cargando } from "@/components/ui/TableStates";
 import { MAX_APPLY_DATES } from "@/lib/domain-rules";
@@ -22,7 +24,11 @@ type Row = {
   fechasAplicacionCumplidas: string[];
   itemIds: string[];
   farmaceutico: string | null;
+  archivedAt: string | null;
+  archivedBy: string | null;
 };
+
+type ArchiveView = "activas" | "archivadas";
 
 function formatDMY(dateStr: string) {
   const [y, m, d] = dateStr.split("-");
@@ -30,11 +36,22 @@ function formatDMY(dateStr: string) {
   return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
 }
 
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("es-CR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export function RegistroPacientes() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
   const [query, setQuery] = useState("");
+  const [archiveView, setArchiveView] = useState<ArchiveView>("activas");
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const [total, setTotal] = useState(0);
@@ -57,6 +74,7 @@ export function RegistroPacientes() {
     fechasAplicacion: string[];
     fechaNueva: string;
   } | null>(null);
+  const [toArchive, setToArchive] = useState<Row | null>(null);
 
   async function load() {
     setLoading(true);
@@ -64,6 +82,7 @@ export function RegistroPacientes() {
     try {
       const url = new URL("/api/registro-pacientes", window.location.origin);
       url.searchParams.set("historico", "1");
+      url.searchParams.set("archivo", archiveView);
       url.searchParams.set("take", String(pageSize));
       url.searchParams.set("offset", String((page - 1) * pageSize));
       const q = query.trim();
@@ -90,9 +109,10 @@ export function RegistroPacientes() {
   }
 
   useEffect(() => {
-    void load();
+    const timer = setTimeout(() => void load(), 250);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, query, archiveView]);
 
   const filtered = useMemo(() => rows, [rows]);
 
@@ -140,40 +160,52 @@ export function RegistroPacientes() {
     }
   }
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setPage(1);
-      void load();
-    }, 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
-
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6">
       <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="w-full max-w-xl">
-            <label className="block text-xs font-medium text-zinc-600">BUSCAR</label>
-            <div className="mt-1 flex items-center gap-2">
-              <div className="relative w-full">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                <Input
-                  className="pl-9"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="CÉDULA / NOMBRE / RECETA / MEDICAMENTO"
-                />
+          <div className="flex w-full max-w-3xl flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="buscar-receta" className="block text-xs font-medium text-zinc-600">BUSCAR</label>
+              <div className="mt-1 flex items-center gap-2">
+                <div className="relative w-full">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <Input
+                    id="buscar-receta"
+                    className="pl-9"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="CÉDULA / NOMBRE / RECETA / MEDICAMENTO"
+                  />
+                </div>
+                <Button variant="secondary" type="button" onClick={() => void load()}>
+                  ACTUALIZAR
+                </Button>
               </div>
-              <Button variant="secondary" type="button" onClick={() => void load()}>
-                ACTUALIZAR
-              </Button>
+            </div>
+            <div className="w-full sm:w-44">
+              <label htmlFor="vista-recetas" className="block text-xs font-medium text-zinc-600">MOSTRAR</label>
+              <Select
+                id="vista-recetas"
+                className="mt-1"
+                value={archiveView}
+                onChange={(event) => {
+                  setArchiveView(event.target.value as ArchiveView);
+                  setPage(1);
+                }}
+              >
+                <option value="activas">RECETAS ACTIVAS</option>
+                <option value="archivadas">RECETAS ARCHIVADAS</option>
+              </Select>
             </div>
           </div>
           <div className="text-sm text-zinc-600">
-            {loading ? <Cargando /> : `${total} registros`}
+            {loading ? <Cargando /> : `${total} registros ${archiveView}`}
           </div>
         </div>
 
@@ -220,19 +252,25 @@ export function RegistroPacientes() {
                           const cumplida = aplicacionesCumplidas.has(key);
                           return (
                             <span key={iso} className="whitespace-nowrap">
-                              <button
-                                type="button"
-                                className={[
-                                  "rounded px-1",
-                                  "underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
-                                  cumplida ? "text-emerald-700" : "text-blue-950",
-                                ].join(" ")}
-                                aria-pressed={cumplida}
-                                title={cumplida ? "APLICACIÓN CUMPLIDA (CLICK PARA DESMARCAR)" : "CLICK PARA MARCAR COMO CUMPLIDA"}
-                                onClick={() => void toggleAplicacionCumplida(r, iso)}
-                              >
-                                {formatDMY(iso)}
-                              </button>
+                              {archiveView === "archivadas" ? (
+                                <span className={cumplida ? "px-1 text-emerald-700" : "px-1 text-blue-950"}>
+                                  {formatDMY(iso)}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={[
+                                    "rounded px-1",
+                                    "underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+                                    cumplida ? "text-emerald-700" : "text-blue-950",
+                                  ].join(" ")}
+                                  aria-pressed={cumplida}
+                                  title={cumplida ? "APLICACIÓN CUMPLIDA (CLICK PARA DESMARCAR)" : "CLICK PARA MARCAR COMO CUMPLIDA"}
+                                  onClick={() => void toggleAplicacionCumplida(r, iso)}
+                                >
+                                  {formatDMY(iso)}
+                                </button>
+                              )}
                               {i < r.fechasAplicacion.length - 1 ? <span className="text-zinc-400">, </span> : null}
                             </span>
                           );
@@ -245,44 +283,62 @@ export function RegistroPacientes() {
                   <td className="px-3 py-2 text-center">{r.farmaceutico ?? "-"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
+                      {archiveView === "activas" ? (
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          className="px-2 py-2"
+                          aria-label="Editar paciente"
+                          title="Editar paciente"
+                          onClick={() =>
+                            setToEditPatient({
+                              patientId: r.patientId,
+                              cedula: r.cedula,
+                              nombre: r.nombre ?? "",
+                              itemIds: r.itemIds,
+                              fechasAplicacion: [...r.fechasAplicacion],
+                              fechaNueva: "",
+                            })
+                          }
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      ) : null}
                       <Button
-                        variant="secondary"
+                        variant="subtle"
                         type="button"
                         className="px-2 py-2"
-                        aria-label="Editar paciente"
-                        title="Editar paciente"
-                        onClick={() =>
-                          setToEditPatient({
-                            patientId: r.patientId,
-                            cedula: r.cedula,
-                            nombre: r.nombre ?? "",
-                            itemIds: r.itemIds,
-                            fechasAplicacion: [...r.fechasAplicacion],
-                            fechaNueva: "",
-                          })
-                        }
+                        aria-label={archiveView === "activas" ? "Archivar receta" : "Restaurar receta"}
+                        title={archiveView === "activas" ? "Archivar receta" : "Restaurar receta"}
+                        onClick={() => setToArchive(r)}
                       >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        {archiveView === "activas" ? (
+                          <Archive className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
+                        )}
                       </Button>
-                      <Button
-                        variant="danger"
-                        type="button"
-                        className="px-2 py-2"
-                        aria-label="Eliminar paciente"
-                        onClick={() =>
-                          setToDelete({
-                            patientId: r.patientId,
-                            cedula: r.cedula,
-                            nombre: r.nombre ?? "",
-                            medicationId: r.medicationId,
-                            medicamento: r.medicamento,
-                            numeroReceta: r.numeroReceta,
-                            dosis: r.dosis,
-                          })
-                        }
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
+                      {archiveView === "activas" ? (
+                        <Button
+                          variant="danger"
+                          type="button"
+                          className="px-2 py-2"
+                          aria-label="Eliminar paciente"
+                          onClick={() =>
+                            setToDelete({
+                              patientId: r.patientId,
+                              cedula: r.cedula,
+                              nombre: r.nombre ?? "",
+                              medicationId: r.medicationId,
+                              medicamento: r.medicamento,
+                              numeroReceta: r.numeroReceta,
+                              dosis: r.dosis,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -325,6 +381,77 @@ export function RegistroPacientes() {
           </div>
         </div>
       </div>
+
+      <Modal
+        open={!!toArchive}
+        title={archiveView === "activas" ? "ARCHIVAR RECETA" : "RESTAURAR RECETA"}
+        onClose={() => setToArchive(null)}
+        footer={
+          toArchive ? (
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={() => setToArchive(null)}>
+                VOLVER
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                onClick={async () => {
+                  if (!toArchive) return;
+                  const archived = archiveView === "activas";
+                  setError(null);
+                  try {
+                    await fetchJson("/api/registro-pacientes/archivo", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        patientId: toArchive.patientId,
+                        numeroReceta: toArchive.numeroReceta,
+                        fechaRecepcion: toArchive.fechaRecepcion,
+                        archived,
+                      }),
+                    });
+                    setToArchive(null);
+                    setToast({
+                      kind: "success",
+                      message: archived ? "RECETA ARCHIVADA" : "RECETA RESTAURADA",
+                    });
+                    await load();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Error");
+                  }
+                }}
+              >
+                {archiveView === "activas" ? "ARCHIVAR RECETA" : "RESTAURAR RECETA"}
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        <div className="space-y-2 text-sm text-zinc-700">
+          <p>
+            {archiveView === "activas" ? "¿ARCHIVAR" : "¿RESTAURAR"} LA RECETA{" "}
+            <span className="font-semibold">{toArchive?.numeroReceta ?? "SIN NÚMERO"}</span>
+            {" "}DE{" "}
+            <span className="font-semibold">
+              {toArchive?.cedula} {toArchive?.nombre}
+            </span>
+            ?
+          </p>
+          <p>
+            {archiveView === "activas"
+              ? "DEJARÁ DE APARECER ENTRE LAS RECETAS ACTIVAS, PERO SE CONSERVARÁN TODOS SUS MEDICAMENTOS, FECHAS Y TRAZABILIDAD."
+              : "VOLVERÁ A APARECER ENTRE LAS RECETAS ACTIVAS CON TODOS SUS MEDICAMENTOS Y FECHAS."}
+          </p>
+          {archiveView === "archivadas" && toArchive?.archivedBy ? (
+            <p className="text-xs text-zinc-500">ARCHIVADA POR: {toArchive.archivedBy}</p>
+          ) : null}
+          {archiveView === "archivadas" && toArchive?.archivedAt ? (
+            <p className="text-xs text-zinc-500">
+              ARCHIVADA EL: {formatDateTime(toArchive.archivedAt)}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         open={!!toDelete}
@@ -523,6 +650,7 @@ export function RegistroPacientes() {
           </div>
         </div>
       </Modal>
+      <Toast toast={toast} onClear={() => setToast(null)} />
     </div>
   );
 }
